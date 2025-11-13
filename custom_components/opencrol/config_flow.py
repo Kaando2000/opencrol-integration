@@ -182,11 +182,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                 except Exception as json_ex:
                                                     _LOGGER.error(f"Error parsing status JSON: {json_ex}")
                                                     # Proceed to password step anyway with original client_id
-                                                    return await self.async_step_password({
+                                                    self._password_step_data = {
                                                         "host": host,
                                                         "port": port,
                                                         "client_id": client_id
-                                                    })
+                                                    }
+                                                    return await self.async_step_password()
                                             else:
                                                 _LOGGER.warning(f"Unexpected status code: {status_response.status}")
                                                 errors["base"] = "cannot_connect"
