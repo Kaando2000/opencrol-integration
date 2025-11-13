@@ -138,54 +138,79 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 base_url = f"http://{host}:{port}"
                 
                 try:
+                    _LOGGER.info(f"Testing connection to {base_url}")
                     async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            f"{base_url}/api/v1/health",
-                            timeout=aiohttp.ClientTimeout(total=5)
-                        ) as response:
-                            if response.status == 200:
-                                # Connection successful, check status for password requirement
-                                try:
-                                    status_data = await response.json()
-                                    # If we can access health, try status to see if password is needed
-                                    async with session.get(
-                                        f"{base_url}/api/v1/status",
-                                        timeout=aiohttp.ClientTimeout(total=5)
-                                    ) as status_response:
-                                        if status_response.status == 401:
-                                            # Password required
-                                            return await self.async_step_password({
-                                                "host": host,
-                                                "port": port,
-                                                "client_id": client_id
-                                            })
-                                        elif status_response.status == 200:
-                                            # No password required
-                                            return await self.async_create_entry(
-                                                title=f"OpenCtrol - {client_id}",
-                                                data={
+                        # First, test health endpoint (no auth required)
+                        try:
+                            async with session.get(
+                                f"{base_url}/api/v1/health",
+                                timeout=aiohttp.ClientTimeout(total=10, connect=5)
+                            ) as health_response:
+                                if health_response.status == 200:
+                                    _LOGGER.info(f"Health endpoint accessible: {health_response.status}")
+                                    # Connection successful, check status for password requirement
+                                    try:
+                                        async with session.get(
+                                            f"{base_url}/api/v1/status",
+                                            timeout=aiohttp.ClientTimeout(total=10, connect=5)
+                                        ) as status_response:
+                                            _LOGGER.info(f"Status endpoint response: {status_response.status}")
+                                            if status_response.status == 401:
+                                                # Password required
+                                                _LOGGER.info("Password required, proceeding to password step")
+                                                return await self.async_step_password({
                                                     "host": host,
                                                     "port": port,
-                                                    "client_id": client_id,
-                                                    "password": "",
-                                                    "base_url": base_url
-                                                }
-                                            )
-                                except:
-                                    # Assume password required if status check fails
-                                    return await self.async_step_password({
-                                        "host": host,
-                                        "port": port,
-                                        "client_id": client_id
-                                    })
-                            else:
-                                errors["base"] = "cannot_connect"
-                except aiohttp.ClientError:
+                                                    "client_id": client_id
+                                                })
+                                            elif status_response.status == 200:
+                                                # No password required
+                                                status_data = await status_response.json()
+                                                _LOGGER.info(f"Connection successful, no password required. Client ID: {status_data.get('client_id', 'unknown')}")
+                                                return await self.async_create_entry(
+                                                    title=f"OpenCtrol - {client_id}",
+                                                    data={
+                                                        "host": host,
+                                                        "port": port,
+                                                        "client_id": client_id,
+                                                        "password": "",
+                                                        "base_url": base_url
+                                                    }
+                                                )
+                                            else:
+                                                _LOGGER.warning(f"Unexpected status code: {status_response.status}")
+                                                errors["base"] = "cannot_connect"
+                                    except aiohttp.ClientError as ex:
+                                        _LOGGER.error(f"Error checking status endpoint: {ex}")
+                                        # Assume password required if status check fails
+                                        return await self.async_step_password({
+                                            "host": host,
+                                            "port": port,
+                                            "client_id": client_id
+                                        })
+                                    except Exception as ex:
+                                        _LOGGER.exception(f"Unexpected error checking status: {ex}")
+                                        errors["base"] = "unknown"
+                                else:
+                                    _LOGGER.error(f"Health endpoint returned status: {health_response.status}")
+                                    errors["base"] = "cannot_connect"
+                        except aiohttp.ClientConnectorError as ex:
+                            _LOGGER.error(f"Connection error: {ex}")
+                            errors["base"] = "cannot_connect"
+                        except aiohttp.ServerTimeoutError:
+                            _LOGGER.error("Connection timeout")
+                            errors["base"] = "timeout"
+                        except asyncio.TimeoutError:
+                            _LOGGER.error("Request timeout")
+                            errors["base"] = "timeout"
+                except aiohttp.ClientError as ex:
+                    _LOGGER.error(f"Client error: {ex}")
                     errors["base"] = "cannot_connect"
                 except asyncio.TimeoutError:
+                    _LOGGER.error("Connection timeout")
                     errors["base"] = "timeout"
                 except Exception as ex:
-                    _LOGGER.exception("Unexpected error during connection test")
+                    _LOGGER.exception(f"Unexpected error during connection test: {ex}")
                     errors["base"] = "unknown"
 
         return self.async_show_form(
@@ -221,14 +246,18 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 headers["X-Password"] = password
             
             try:
+                _LOGGER.info(f"Validating password for {base_url}")
                 async with aiohttp.ClientSession() as session:
                     async with session.get(
                         f"{base_url}/api/v1/status",
                         headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=5)
+                        timeout=aiohttp.ClientTimeout(total=10, connect=5)
                     ) as response:
+                        _LOGGER.info(f"Password validation response: {response.status}")
                         if response.status == 200:
                             # Password correct, create entry
+                            status_data = await response.json()
+                            _LOGGER.info(f"Password validated successfully. Client ID: {status_data.get('client_id', 'unknown')}")
                             return await self.async_create_entry(
                                 title=f"OpenCtrol - {client_id}",
                                 data={
@@ -240,15 +269,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 }
                             )
                         elif response.status == 401:
+                            _LOGGER.warning("Password validation failed: invalid password")
                             errors["base"] = "invalid_auth"
                         else:
+                            _LOGGER.error(f"Unexpected status code: {response.status}")
                             errors["base"] = "cannot_connect"
-            except aiohttp.ClientError:
+            except aiohttp.ClientConnectorError as ex:
+                _LOGGER.error(f"Connection error during password validation: {ex}")
                 errors["base"] = "cannot_connect"
+            except aiohttp.ServerTimeoutError:
+                _LOGGER.error("Connection timeout during password validation")
+                errors["base"] = "timeout"
             except asyncio.TimeoutError:
+                _LOGGER.error("Request timeout during password validation")
                 errors["base"] = "timeout"
             except Exception as ex:
-                _LOGGER.exception("Unexpected error during password validation")
+                _LOGGER.exception(f"Unexpected error during password validation: {ex}")
                 errors["base"] = "unknown"
 
         return self.async_show_form(
