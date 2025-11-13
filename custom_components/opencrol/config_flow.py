@@ -143,7 +143,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 try:
                     _LOGGER.info(f"Testing connection to {base_url}")
                     _LOGGER.debug(f"Connection details: host={host}, port={port}, base_url={base_url}")
-                    async with aiohttp.ClientSession() as session:
+                    # Create session with connector that allows all SSL and connection settings
+                    connector = aiohttp.TCPConnector(limit=10, limit_per_host=5)
+                    async with aiohttp.ClientSession(connector=connector) as session:
                         # First, test health endpoint (no auth required)
                         try:
                             _LOGGER.debug(f"Attempting to connect to health endpoint: {base_url}/api/v1/health")
