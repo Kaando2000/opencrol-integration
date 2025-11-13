@@ -166,14 +166,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                             elif status_response.status == 200:
                                                 # Status accessible - always proceed to password step
                                                 # User can leave password empty if no password is set
-                                                status_data = await status_response.json()
-                                                actual_client_id = status_data.get('client_id', client_id)
-                                                _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
-                                                return await self.async_step_password({
-                                                    "host": host,
-                                                    "port": port,
-                                                    "client_id": actual_client_id
-                                                })
+                                                try:
+                                                    status_data = await status_response.json()
+                                                    actual_client_id = status_data.get('client_id', client_id)
+                                                    _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
+                                                    return await self.async_step_password({
+                                                        "host": host,
+                                                        "port": port,
+                                                        "client_id": actual_client_id
+                                                    })
+                                                except Exception as json_ex:
+                                                    _LOGGER.error(f"Error parsing status JSON: {json_ex}")
+                                                    # Proceed to password step anyway with original client_id
+                                                    return await self.async_step_password({
+                                                        "host": host,
+                                                        "port": port,
+                                                        "client_id": client_id
+                                                    })
                                             else:
                                                 _LOGGER.warning(f"Unexpected status code: {status_response.status}")
                                                 errors["base"] = "cannot_connect"
