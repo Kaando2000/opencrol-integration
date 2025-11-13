@@ -291,19 +291,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         _LOGGER.info(f"Password validation response: {response.status}")
                         if response.status == 200:
                             # Password correct (or no password required), create entry
-                            status_data = await response.json()
-                            actual_client_id = status_data.get('client_id', client_id)
-                            _LOGGER.info(f"Connection successful. Client ID: {actual_client_id}")
-                            return await self.async_create_entry(
-                                title=f"OpenCtrol - {actual_client_id}",
-                                data={
-                                    "host": host,
-                                    "port": port,
-                                    "client_id": actual_client_id,
-                                    "password": password,
-                                    "base_url": base_url
-                                }
-                            )
+                            try:
+                                status_data = await response.json()
+                                actual_client_id = status_data.get('client_id', client_id)
+                                _LOGGER.info(f"Connection successful. Client ID: {actual_client_id}")
+                                return await self.async_create_entry(
+                                    title=f"OpenCtrol - {actual_client_id}",
+                                    data={
+                                        "host": host,
+                                        "port": port,
+                                        "client_id": actual_client_id,
+                                        "password": password,
+                                        "base_url": base_url
+                                    }
+                                )
+                            except Exception as json_ex:
+                                _LOGGER.error(f"Error parsing JSON response: {json_ex}")
+                                errors["base"] = "cannot_connect"
                         elif response.status == 401:
                             if password:
                                 _LOGGER.warning("Password validation failed: invalid password")
