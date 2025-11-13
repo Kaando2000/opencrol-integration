@@ -1,0 +1,236 @@
+opencrol-remote-card {
+  display: block;
+}
+
+opencrol-remote-card ha-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+opencrol-remote-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: var(--card-background-color, #fff);
+  border-bottom: 1px solid var(--divider-color, #e0e0e0);
+}
+
+opencrol-remote-card .card-header .name {
+  font-weight: bold;
+  font-size: 1.2em;
+  color: var(--primary-text-color, #212121);
+}
+
+opencrol-remote-card .card-header .status {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+opencrol-remote-card .card-header .status.online {
+  background-color: #4caf50;
+  color: white;
+}
+
+opencrol-remote-card .card-header .status.offline {
+  background-color: #f44336;
+  color: white;
+}
+
+opencrol-remote-card .card-content {
+  display: flex;
+  flex-direction: column;
+}
+
+opencrol-remote-card .screen-container {
+  position: relative;
+  width: 100%;
+  background-color: #000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  max-height: 600px;
+  overflow: hidden;
+}
+
+opencrol-remote-card .screen-view {
+  max-width: 100%;
+  max-height: 600px;
+  object-fit: contain;
+  display: block;
+  cursor: crosshair;
+}
+
+opencrol-remote-card .screen-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: crosshair;
+  z-index: 1;
+}
+
+opencrol-remote-card .screen-placeholder {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f5f5;
+  color: #999;
+}
+
+opencrol-remote-card .placeholder-text {
+  font-size: 1.1em;
+}
+
+opencrol-remote-card .controls-panel {
+  padding: 16px;
+  background-color: var(--card-background-color, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+opencrol-remote-card .control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+opencrol-remote-card .section-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  color: var(--secondary-text-color, #757575);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+opencrol-remote-card .button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+opencrol-remote-card .control-btn {
+  padding: 8px 16px;
+  background-color: var(--primary-color, #03a9f4);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: opacity 0.2s, transform 0.1s;
+  flex: 1;
+  min-width: 80px;
+}
+
+opencrol-remote-card .control-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+opencrol-remote-card .control-btn:active {
+  transform: translateY(0);
+}
+
+opencrol-remote-card .control-btn.small {
+  padding: 6px 12px;
+  font-size: 0.85em;
+  min-width: 60px;
+}
+
+opencrol-remote-card .control-btn.danger {
+  background-color: #f44336;
+}
+
+opencrol-remote-card .input-group {
+  display: flex;
+  gap: 8px;
+}
+
+opencrol-remote-card .text-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--divider-color, #e0e0e0);
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #212121);
+}
+
+opencrol-remote-card .text-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #03a9f4);
+}
+
+opencrol-remote-card .volume-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+opencrol-remote-card .volume-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--divider-color, #e0e0e0);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+opencrol-remote-card .volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-color, #03a9f4);
+  cursor: pointer;
+}
+
+opencrol-remote-card .volume-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary-color, #03a9f4);
+  cursor: pointer;
+  border: none;
+}
+
+opencrol-remote-card .volume-value {
+  min-width: 45px;
+  text-align: right;
+  font-weight: 500;
+  color: var(--primary-text-color, #212121);
+}
+
+opencrol-remote-card .monitor-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--divider-color, #e0e0e0);
+  border-radius: 4px;
+  font-size: 0.9em;
+  background-color: var(--card-background-color, #fff);
+  color: var(--primary-text-color, #212121);
+  cursor: pointer;
+}
+
+opencrol-remote-card .monitor-select:focus {
+  outline: none;
+  border-color: var(--primary-color, #03a9f4);
+}
+
+opencrol-remote-card .error {
+  padding: 16px;
+  color: #f44336;
+  text-align: center;
+}
+

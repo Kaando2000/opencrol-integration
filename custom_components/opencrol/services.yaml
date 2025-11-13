@@ -1,0 +1,162 @@
+move_mouse:
+  name: Move Mouse
+  description: Move mouse to specified coordinates
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    x:
+      name: X Coordinate
+      description: X position in pixels
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 7680
+          unit_of_measurement: px
+    y:
+      name: Y Coordinate
+      description: Y position in pixels
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 4320
+          unit_of_measurement: px
+
+click:
+  name: Click
+  description: Perform mouse click at current or specified position
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    x:
+      name: X Coordinate
+      description: X position in pixels (optional, uses current position if not specified)
+      selector:
+        number:
+          min: 0
+          max: 7680
+          unit_of_measurement: px
+    y:
+      name: Y Coordinate
+      description: Y position in pixels (optional, uses current position if not specified)
+      selector:
+        number:
+          min: 0
+          max: 4320
+          unit_of_measurement: px
+    button:
+      name: Button
+      description: Mouse button to click
+      selector:
+        select:
+          options:
+            - left
+            - right
+            - middle
+      default: left
+
+type_text:
+  name: Type Text
+  description: Type text on the remote computer
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    text:
+      name: Text
+      description: Text to type
+      required: true
+      selector:
+        text:
+
+send_key:
+  name: Send Key
+  description: Send a single key or key combination
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    key:
+      name: Key
+      description: Single key to send (e.g., 'Enter', 'Tab', 'a', 'CTRL+C')
+      required: true
+      selector:
+        text:
+
+set_app_volume:
+  name: Set App Volume
+  description: Set volume for a specific application
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: number
+    process_id:
+      name: Process ID
+      description: Process ID of the application
+      required: true
+      selector:
+        number:
+          min: 0
+    volume:
+      name: Volume
+      description: Volume level (0.0 to 1.0)
+      required: true
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.01
+
+set_app_device:
+  name: Set App Device
+  description: Set output device for a specific application
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: select
+    process_id:
+      name: Process ID
+      description: Process ID of the application
+      required: true
+      selector:
+        number:
+          min: 0
+    device_id:
+      name: Device ID
+      description: Output device ID
+      required: true
+      selector:
+        text:
+
+take_screenshot:
+  name: Take Screenshot
+  description: Capture and save a screenshot
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+

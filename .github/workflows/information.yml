@@ -1,0 +1,19 @@
+name: Information
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 1"
+
+jobs:
+  information:
+    name: HACS Information
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v3"
+      - name: HACS Action
+        uses: "hacs/action@main"
+        with:
+          category: "integration"
+          action: "information"
+

@@ -1,0 +1,81 @@
+"""Media Player platform for OpenCtrol screen viewing."""
+
+from typing import Any
+
+from homeassistant.components.media_player import (
+    MediaPlayerEntity,
+    MediaPlayerState,
+    MediaPlayerEntityFeature,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import DOMAIN, ATTR_CLIENT_ID
+from .coordinator import OpenCtrolCoordinator
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up OpenCtrol media player."""
+    coordinator: OpenCtrolCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities([OpenCtrolScreenViewer(coordinator, entry)])
+
+
+class OpenCtrolScreenViewer(
+    CoordinatorEntity, MediaPlayerEntity
+):
+    """Representation of OpenCtrol screen viewer."""
+
+    _attr_should_poll = False
+
+    def __init__(self, coordinator: OpenCtrolCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the screen viewer."""
+        super().__init__(coordinator)
+        self.coordinator = coordinator
+        self.entry = entry
+        self._attr_unique_id = f"{entry.entry_id}_screen"
+        self._attr_name = f"{entry.data.get(ATTR_CLIENT_ID)} Screen"
+        self._attr_state = MediaPlayerState.IDLE
+        self._attr_supported_features = (
+            MediaPlayerEntityFeature.VOLUME_SET
+            | MediaPlayerEntityFeature.TURN_ON
+            | MediaPlayerEntityFeature.TURN_OFF
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return self.coordinator.last_update_success and self.coordinator.data.get("status") == "online"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the state attributes."""
+        host = self.entry.data.get("host", "localhost")
+        port = self.entry.data.get("port", 8080)
+        base_url = f"http://{host}:{port}"
+        
+        return {
+            "client_id": self.entry.data.get(ATTR_CLIENT_ID),
+            "base_url": base_url,
+            "stream_url": f"{base_url}/api/v1/screenstream/stream",
+            "frame_url": f"{base_url}/api/v1/screenstream/frame",
+            "monitors": self.coordinator.data.get("monitors", []),
+        }
+
+    async def async_turn_on(self) -> None:
+        """Turn on the screen capture."""
+        await self.coordinator.send_command("start_screen_capture")
+
+    async def async_turn_off(self) -> None:
+        """Turn off the screen capture."""
+        await self.coordinator.send_command("stop_screen_capture")
+
+    async def async_set_volume_level(self, volume: float) -> None:
+        """Set master volume level."""
+        await self.coordinator.send_command("set_volume", volume=volume)
+

@@ -1,0 +1,8 @@
+{
+  "name": "OpenCtrol",
+  "render_readme": true,
+  "domains": ["opencrol"],
+  "iot_class": "Local Push",
+  "homeassistant": "2024.1.0"
+}
+
