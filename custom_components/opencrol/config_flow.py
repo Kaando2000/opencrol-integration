@@ -172,13 +172,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                 try:
                                                     status_data = await status_response.json()
                                                     actual_client_id = status_data.get('client_id', client_id)
-                                                _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
-                                                self._password_step_data = {
-                                                    "host": host,
-                                                    "port": port,
-                                                    "client_id": actual_client_id
-                                                }
-                                                return await self.async_step_password()
+                                                    _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
+                                                    self._password_step_data = {
+                                                        "host": host,
+                                                        "port": port,
+                                                        "client_id": actual_client_id
+                                                    }
+                                                    return await self.async_step_password()
                                                 except Exception as json_ex:
                                                     _LOGGER.error(f"Error parsing status JSON: {json_ex}")
                                                     # Proceed to password step anyway with original client_id
