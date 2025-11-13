@@ -28,6 +28,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize config flow."""
         self._discovered_devices: list[dict[str, Any]] = []
         self._selected_device: dict[str, Any] | None = None
+        self._password_step_data: dict[str, Any] = {}  # Store data for password step
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -77,11 +78,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         
                         if requires_password:
                             # Go to password entry step
-                            return await self.async_step_password({
+                            self._password_step_data = {
                                 "host": host,
                                 "port": port,
                                 "client_id": client_id
-                            })
+                            }
+                            return await self.async_step_password()
                         else:
                             # No password required, create entry directly
                             return await self.async_create_entry(
@@ -158,23 +160,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                             if status_response.status == 401:
                                                 # Password required
                                                 _LOGGER.info("Password required, proceeding to password step")
-                                                return await self.async_step_password({
+                                                self._password_step_data = {
                                                     "host": host,
                                                     "port": port,
                                                     "client_id": client_id
-                                                })
+                                                }
+                                                return await self.async_step_password()
                                             elif status_response.status == 200:
                                                 # Status accessible - always proceed to password step
                                                 # User can leave password empty if no password is set
                                                 try:
                                                     status_data = await status_response.json()
                                                     actual_client_id = status_data.get('client_id', client_id)
-                                                    _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
-                                                    return await self.async_step_password({
-                                                        "host": host,
-                                                        "port": port,
-                                                        "client_id": actual_client_id
-                                                    })
+                                                _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
+                                                self._password_step_data = {
+                                                    "host": host,
+                                                    "port": port,
+                                                    "client_id": actual_client_id
+                                                }
+                                                return await self.async_step_password()
                                                 except Exception as json_ex:
                                                     _LOGGER.error(f"Error parsing status JSON: {json_ex}")
                                                     # Proceed to password step anyway with original client_id
@@ -189,11 +193,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     except aiohttp.ClientError as ex:
                                         _LOGGER.error(f"Error checking status endpoint: {ex}")
                                         # Assume password required if status check fails
-                                        return await self.async_step_password({
+                                        self._password_step_data = {
                                             "host": host,
                                             "port": port,
                                             "client_id": client_id
-                                        })
+                                        }
+                                        return await self.async_step_password()
                                     except aiohttp.ClientConnectorError as ex:
                                         _LOGGER.error(f"Connection error checking status: {ex}")
                                         errors["base"] = "cannot_connect"
@@ -273,11 +278,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle password entry."""
         errors = {}
         
-        # Get device info from previous step
-        device_info = user_input or {}
-        host = device_info.get("host", "")
-        port = device_info.get("port", 8080)
-        client_id = device_info.get("client_id", host)
+        # Get device info from previous step (stored in flow instance)
+        # If user_input has the data (first call), use it and store it
+        if user_input and "host" in user_input:
+            self._password_step_data = {
+                "host": user_input.get("host", ""),
+                "port": user_input.get("port", 8080),
+                "client_id": user_input.get("client_id", "")
+            }
+        
+        # Use stored data
+        host = self._password_step_data.get("host", "")
+        port = self._password_step_data.get("port", 8080)
+        client_id = self._password_step_data.get("client_id", host)
+        
+        # Validate host is not empty
+        if not host:
+            _LOGGER.error("Host is empty in password step - this should not happen")
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(
+                step_id="password",
+                data_schema=vol.Schema({
+                    vol.Required("password"): str,
+                }),
+                errors=errors,
+            )
         
         if user_input is not None and "password" in user_input:
             password = user_input.get("password", "").strip()
