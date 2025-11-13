@@ -142,9 +142,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 try:
                     _LOGGER.info(f"Testing connection to {base_url}")
+                    _LOGGER.debug(f"Connection details: host={host}, port={port}, base_url={base_url}")
                     async with aiohttp.ClientSession() as session:
                         # First, test health endpoint (no auth required)
                         try:
+                            _LOGGER.debug(f"Attempting to connect to health endpoint: {base_url}/api/v1/health")
                             async with session.get(
                                 f"{base_url}/api/v1/health",
                                 timeout=aiohttp.ClientTimeout(total=10, connect=5)
@@ -224,7 +226,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     _LOGGER.error(f"Health endpoint returned status: {health_response.status}")
                                     errors["base"] = "cannot_connect"
                         except aiohttp.ClientConnectorError as ex:
-                            _LOGGER.error(f"Connection error: {ex}")
+                            _LOGGER.error(f"Connection error to {base_url}: {ex}")
+                            _LOGGER.error(f"Connection error details: {type(ex).__name__}: {str(ex)}")
                             errors["base"] = "cannot_connect"
                         except aiohttp.ServerTimeoutError:
                             _LOGGER.error("Connection timeout")

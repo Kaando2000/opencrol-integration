@@ -35,7 +35,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to OpenCtrol client. Please check:\n- Client is running (check system tray)\n- IP address is correct (192.168.1.52)\n- Port is correct (default: 8080)\n- Windows Firewall allows connections on port 8080\n- Home Assistant can reach the PC on your network",
+      "cannot_connect": "Unable to connect to OpenCtrol client. Please check:\n- Client is running (check system tray on PC)\n- IP address is correct (use PC's IP, NOT localhost)\n- Port is correct (default: 8080)\n- Windows Firewall allows connections on port 8080\n- Home Assistant and PC are on the same network\n- Test from Home Assistant: curl http://[PC_IP]:8080/api/v1/health\n\nCheck Home Assistant logs for detailed error message.",
       "invalid_auth": "Invalid password. Please try again.",
       "timeout": "Connection timeout. Please check:\n- Client is running\n- Network connectivity\n- Firewall settings",
       "unknown": "An unexpected error occurred. Check Home Assistant logs for details.",
