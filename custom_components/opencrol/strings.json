@@ -1,0 +1,50 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "OpenCtrol Setup",
+        "description": "Connect to your OpenCtrol Windows client",
+        "data": {
+          "host": "Host (IP address)",
+          "port": "Port",
+          "client_id": "Client ID (optional)"
+        }
+      },
+      "discovery": {
+        "title": "Select Device",
+        "description": "Select the OpenCtrol device to connect to",
+        "data": {
+          "device": "Device"
+        }
+      },
+      "manual": {
+        "title": "Manual Configuration",
+        "description": "Enter your OpenCtrol client details",
+        "data": {
+          "host": "Host (IP address)",
+          "port": "Port",
+          "client_id": "Client ID (optional)"
+        }
+      },
+      "password": {
+        "title": "Enter Password",
+        "description": "Enter the password for {device}",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to OpenCtrol client. Please check:\n- Client is running\n- IP address is correct\n- Port is correct (default: 8080)\n- Firewall allows connections",
+      "invalid_auth": "Invalid password. Please try again.",
+      "timeout": "Connection timeout. Please check:\n- Client is running\n- Network connectivity\n- Firewall settings",
+      "unknown": "An unexpected error occurred. Check Home Assistant logs for details.",
+      "host_required": "Host (IP address) is required",
+      "invalid_device": "Invalid device selected"
+    },
+    "abort": {
+      "already_configured": "This device is already configured"
+    }
+  }
+}
+

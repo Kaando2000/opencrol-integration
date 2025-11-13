@@ -190,7 +190,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                         })
                                     except Exception as ex:
                                         _LOGGER.exception(f"Unexpected error checking status: {ex}")
-                                        errors["base"] = "unknown"
+                                        # Show actual error message instead of generic "unknown"
+                                        error_msg = str(ex)
+                                        if "Connection" in error_msg or "connect" in error_msg.lower():
+                                            errors["base"] = "cannot_connect"
+                                        elif "timeout" in error_msg.lower():
+                                            errors["base"] = "timeout"
+                                        else:
+                                            errors["base"] = "unknown"
+                                            _LOGGER.error(f"Unknown error type: {error_msg}")
                                 else:
                                     _LOGGER.error(f"Health endpoint returned status: {health_response.status}")
                                     errors["base"] = "cannot_connect"
@@ -211,7 +219,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors["base"] = "timeout"
                 except Exception as ex:
                     _LOGGER.exception(f"Unexpected error during connection test: {ex}")
-                    errors["base"] = "unknown"
+                    # Show actual error message instead of generic "unknown"
+                    error_msg = str(ex)
+                    if "Connection" in error_msg or "connect" in error_msg.lower() or "refused" in error_msg.lower():
+                        errors["base"] = "cannot_connect"
+                    elif "timeout" in error_msg.lower():
+                        errors["base"] = "timeout"
+                    elif "name resolution" in error_msg.lower() or "DNS" in error_msg:
+                        errors["base"] = "cannot_connect"
+                    else:
+                        errors["base"] = "unknown"
+                        _LOGGER.error(f"Unknown error type: {error_msg}")
 
         return self.async_show_form(
             step_id="manual",
@@ -285,7 +303,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "timeout"
             except Exception as ex:
                 _LOGGER.exception(f"Unexpected error during password validation: {ex}")
-                errors["base"] = "unknown"
+                # Show actual error message instead of generic "unknown"
+                error_msg = str(ex)
+                if "Connection" in error_msg or "connect" in error_msg.lower() or "refused" in error_msg.lower():
+                    errors["base"] = "cannot_connect"
+                elif "timeout" in error_msg.lower():
+                    errors["base"] = "timeout"
+                else:
+                    errors["base"] = "unknown"
+                    _LOGGER.error(f"Unknown error type during password validation: {error_msg}")
 
         return self.async_show_form(
             step_id="password",
