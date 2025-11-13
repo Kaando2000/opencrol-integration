@@ -280,7 +280,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         client_id = device_info.get("client_id", host)
         
         if user_input is not None and "password" in user_input:
-            password = user_input.get("password", "")
+            password = user_input.get("password", "").strip()
             
             # Test connection with password
             import aiohttp

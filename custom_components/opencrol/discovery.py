@@ -58,10 +58,15 @@ async def discover_opencrol_devices() -> list[dict[str, Any]]:
         listener = OpenCtrolListener(on_device_found)
         browser = ServiceBrowser(zeroconf, "_opencrol._tcp.local.", listener)
 
-        # Wait longer for discovery (mDNS can be slow)
+        # Wait longer for discovery (mDNS can be slow, especially on Windows)
         import asyncio
         _LOGGER.info("Searching for OpenCtrol devices on local network...")
-        await asyncio.sleep(5)  # Increased from 2 to 5 seconds
+        # Try multiple times with shorter intervals to catch services that register late
+        for i in range(3):
+            await asyncio.sleep(3)  # 3 seconds x 3 = 9 seconds total
+            if devices:
+                _LOGGER.info(f"Found {len(devices)} device(s) after {3*(i+1)} seconds")
+                break
 
         browser.cancel()
         zeroconf.close()
