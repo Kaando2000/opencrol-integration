@@ -164,19 +164,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                     "client_id": client_id
                                                 })
                                             elif status_response.status == 200:
-                                                # No password required
+                                                # Status accessible - always proceed to password step
+                                                # User can leave password empty if no password is set
                                                 status_data = await status_response.json()
-                                                _LOGGER.info(f"Connection successful, no password required. Client ID: {status_data.get('client_id', 'unknown')}")
-                                                return await self.async_create_entry(
-                                                    title=f"OpenCtrol - {client_id}",
-                                                    data={
-                                                        "host": host,
-                                                        "port": port,
-                                                        "client_id": client_id,
-                                                        "password": "",
-                                                        "base_url": base_url
-                                                    }
-                                                )
+                                                actual_client_id = status_data.get('client_id', client_id)
+                                                _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
+                                                return await self.async_step_password({
+                                                    "host": host,
+                                                    "port": port,
+                                                    "client_id": actual_client_id
+                                                })
                                             else:
                                                 _LOGGER.warning(f"Unexpected status code: {status_response.status}")
                                                 errors["base"] = "cannot_connect"
