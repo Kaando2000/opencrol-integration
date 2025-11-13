@@ -26,6 +26,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self):
         """Initialize config flow."""
+        super().__init__()
         self._discovered_devices: list[dict[str, Any]] = []
         self._selected_device: dict[str, Any] | None = None
         self._password_step_data: dict[str, Any] = {}  # Store data for password step
