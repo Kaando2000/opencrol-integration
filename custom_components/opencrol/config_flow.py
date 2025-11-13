@@ -273,22 +273,28 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ) as response:
                         _LOGGER.info(f"Password validation response: {response.status}")
                         if response.status == 200:
-                            # Password correct, create entry
+                            # Password correct (or no password required), create entry
                             status_data = await response.json()
-                            _LOGGER.info(f"Password validated successfully. Client ID: {status_data.get('client_id', 'unknown')}")
+                            actual_client_id = status_data.get('client_id', client_id)
+                            _LOGGER.info(f"Connection successful. Client ID: {actual_client_id}")
                             return await self.async_create_entry(
-                                title=f"OpenCtrol - {client_id}",
+                                title=f"OpenCtrol - {actual_client_id}",
                                 data={
                                     "host": host,
                                     "port": port,
-                                    "client_id": client_id,
+                                    "client_id": actual_client_id,
                                     "password": password,
                                     "base_url": base_url
                                 }
                             )
                         elif response.status == 401:
-                            _LOGGER.warning("Password validation failed: invalid password")
-                            errors["base"] = "invalid_auth"
+                            if password:
+                                _LOGGER.warning("Password validation failed: invalid password")
+                                errors["base"] = "invalid_auth"
+                            else:
+                                # No password provided but password is required
+                                _LOGGER.warning("Password is required but not provided")
+                                errors["base"] = "invalid_auth"
                         else:
                             _LOGGER.error(f"Unexpected status code: {response.status}")
                             errors["base"] = "cannot_connect"
