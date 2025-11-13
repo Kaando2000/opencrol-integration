@@ -287,7 +287,7 @@ window.customCards.push({
   name: 'OpenCtrol Remote',
   description: 'Remote control card for OpenCtrol devices',
   preview: true,
-  documentationURL: 'https://github.com/opencrol/integration'
+  documentationURL: 'https://github.com/Kaando2000/opencrol-integration'
 });
 
 

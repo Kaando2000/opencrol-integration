@@ -1,8 +1,8 @@
 # OpenCtrol Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub release](https://img.shields.io/github/release/opencrol/integration.svg)](https://github.com/opencrol/integration/releases)
-[![License](https://img.shields.io/github/license/opencrol/integration.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/release/Kaando2000/opencrol-integration.svg)](https://github.com/Kaando2000/opencrol-integration/releases)
+[![License](https://img.shields.io/github/license/Kaando2000/opencrol-integration.svg)](LICENSE)
 
 Custom Home Assistant integration for controlling Windows PCs remotely via HTTP REST API.
 
@@ -24,7 +24,7 @@ Custom Home Assistant integration for controlling Windows PCs remotely via HTTP 
 1. Install [HACS](https://hacs.xyz/) if you haven't already
 2. Go to **HACS** → **Integrations**
 3. Click **"+"** → **Custom Repository**
-4. Add repository: `https://github.com/opencrol/integration`
+4. Add repository: `https://github.com/Kaando2000/opencrol-integration`
 5. Category: **Integration**
 6. Click **Install**
 7. Restart Home Assistant
@@ -209,5 +209,5 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/opencrol/integration/issues)
-- **Documentation**: [Full Documentation](https://github.com/opencrol/integration/wiki)
+- **Issues**: [GitHub Issues](https://github.com/Kaando2000/opencrol-integration/issues)
+- **Documentation**: [Full Documentation](https://github.com/Kaando2000/opencrol-integration)
