@@ -1,63 +1,54 @@
-# 🚀 Push to GitHub Now
+# Push Integration to GitHub
 
-## Current Status
+## Changes Ready to Push
 
-✅ **Repository initialized**  
-✅ **41 files committed**  
-✅ **Remote configured**: `https://github.com/kaando2000/opencrol-integration.git`  
-⏳ **Ready to push**
+The following changes have been committed locally and are ready to push:
 
-## Quick Push Options
+### Modified Files:
+- `custom_components/opencrol/config_flow.py` - Password-only config flow with auto-discovery
+- `custom_components/opencrol/const.py` - Updated constants (removed MQTT, added password)
+- `custom_components/opencrol/coordinator.py` - Updated to use password instead of API key
+- `custom_components/opencrol/discovery.py` - Enhanced mDNS discovery with TXT record parsing
+- `custom_components/opencrol/http_client.py` - Updated to use X-Password header
 
-### Option 1: GitHub Desktop (Easiest - Recommended)
+### New Features:
+- ✅ Password-only authentication (no API key needed)
+- ✅ Auto-discovery of OpenCtrol devices on local network
+- ✅ Simplified config flow (only asks for password)
+- ✅ Automatic device detection with host/port/client_id
 
-1. Download: https://desktop.github.com/
-2. Install and sign in
-3. File → Add Local Repository
-4. Browse to: `E:\OpenCtrol\Cursor\Integration`
-5. Click "Publish repository"
-6. **Uncheck** "Keep this code private" (must be public!)
-7. Click "Publish repository"
+## How to Push
 
-### Option 2: Command Line with Token
+### Option 1: GitHub Desktop (Recommended)
+1. Open GitHub Desktop
+2. You should see the commit ready to push
+3. Click "Push origin" button
 
-1. **Get Personal Access Token:**
-   - Go to: https://github.com/settings/tokens/new
-   - Name: "OpenCtrol Push"
-   - Expiration: 90 days (or your preference)
-   - Select: **repo** (full control)
-   - Click "Generate token"
-   - **COPY THE TOKEN**
+### Option 2: Command Line with Personal Access Token
+```bash
+cd Integration
+git push https://YOUR_TOKEN@github.com/Kaando2000/opencrol-integration.git main
+```
 
-2. **Push:**
-   ```powershell
-   cd E:\OpenCtrol\Cursor\Integration
-   git push -u origin main
-   ```
-   - Username: `kaando2000`
-   - Password: **Paste your token** (not your GitHub password!)
+### Option 3: SSH (if configured)
+```bash
+cd Integration
+git push git@github.com:Kaando2000/opencrol-integration.git main
+```
 
-### Option 3: Create Repository First (If it doesn't exist)
+## After Pushing
 
-If the repository doesn't exist on GitHub yet:
+Once pushed, you can:
+1. Install the integration in Home Assistant via HACS or manual installation
+2. The integration will auto-discover your OpenCtrol client
+3. You'll only need to enter the password to complete setup
 
-1. Go to: https://github.com/new
-2. Repository name: `opencrol-integration`
-3. **Public** visibility
-4. **DO NOT** initialize with README
-5. Click "Create repository"
-6. Then use Option 2 above to push
+## Testing
 
-## After Push
-
-1. **Verify**: https://github.com/kaando2000/opencrol-integration
-2. **Create Release**: See COMPLETE_GITHUB_SETUP.md
-3. **Install via HACS**: See HACS_INSTALL.md
-
-## Repository URL
-
-Once pushed, your repository will be at:
-**https://github.com/kaando2000/opencrol-integration**
-
-Users can install via HACS using this URL!
-
+After installation:
+1. Go to Settings → Devices & Services
+2. Click "Add Integration"
+3. Search for "OpenCtrol"
+4. The integration should auto-discover your device
+5. Enter the password you set in the OpenCtrol client
+6. Complete the setup
