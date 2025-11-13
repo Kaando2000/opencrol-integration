@@ -20,7 +20,9 @@ class OpenCtrolListener(ServiceListener):
         if info:
             properties = {}
             for key, value in info.properties.items():
-                properties[key.decode()] = value.decode() if isinstance(value, bytes) else value
+                key_str = key.decode() if isinstance(key, bytes) else str(key)
+                value_str = value.decode() if isinstance(value, bytes) else str(value)
+                properties[key_str] = value_str
 
             host = str(info.parsed_addresses()[0]) if info.parsed_addresses() else None
             port = info.port

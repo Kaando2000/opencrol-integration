@@ -16,10 +16,10 @@ MAX_RETRY_DELAY = 10.0  # seconds
 class OpenCtrolHttpClient:
     """HTTP client for communicating with OpenCtrol Windows client."""
 
-    def __init__(self, base_url: str, api_key: str | None = None):
+    def __init__(self, base_url: str, password: str | None = None):
         """Initialize HTTP client."""
         self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        self.password = password
         self._session: aiohttp.ClientSession | None = None
 
     async def _retry_request(
@@ -77,8 +77,8 @@ class OpenCtrolHttpClient:
                 "User-Agent": "HomeAssistant-OpenCtrol/2.0",
                 "Accept": "application/json"
             }
-            if self.api_key:
-                headers["X-API-Key"] = self.api_key
+            if self.password:
+                headers["X-Password"] = self.password
 
             # Performance: Optimize connection pooling
             connector = aiohttp.TCPConnector(

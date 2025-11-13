@@ -5,10 +5,7 @@ DOMAIN = "opencrol"
 # Configuration keys
 CONF_HOST = "host"
 CONF_PORT = "port"
-CONF_MQTT_USERNAME = "mqtt_username"
-CONF_MQTT_PASSWORD = "mqtt_password"
-CONF_MQTT_BROKER = "mqtt_broker"
-CONF_AUTH_KEY = "auth_key"
+CONF_PASSWORD = "password"
 CONF_CLIENT_ID = "client_id"
 
 # MQTT Topics

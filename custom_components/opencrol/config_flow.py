@@ -15,11 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 
 from .const import (
     DOMAIN,
-    CONF_MQTT_BROKER,
-    CONF_MQTT_USERNAME,
-    CONF_MQTT_PASSWORD,
     CONF_CLIENT_ID,
-    CONF_AUTH_KEY,
 )
 
 
@@ -28,82 +24,241 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self):
+        """Initialize config flow."""
+        self._discovered_devices: list[dict[str, Any]] = []
+        self._selected_device: dict[str, Any] | None = None
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
+        """Handle the initial step - auto-discovery."""
         errors = {}
         
         # Try auto-discovery if no user input yet
         if user_input is None:
             try:
                 from . import discovery
-                devices = await discovery.discover_opencrol_devices()
-                if devices:
-                    _LOGGER.info(f"Discovered {len(devices)} OpenCtrol device(s)")
-                    # Show discovered devices as options
-                    # For now, we'll just log them and let user enter manually
+                self._discovered_devices = await discovery.discover_opencrol_devices()
+                if self._discovered_devices:
+                    _LOGGER.info(f"Discovered {len(self._discovered_devices)} OpenCtrol device(s)")
+                    # Show discovered devices
+                    return await self.async_step_discovery()
             except Exception as ex:
                 _LOGGER.debug(f"Auto-discovery failed: {ex}")
 
+        # If no devices found or user wants manual entry
+        return await self.async_step_manual()
+
+    async def async_step_discovery(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle device selection from discovered devices."""
+        errors = {}
+        
         if user_input is not None:
-            try:
-                # Validate connection
-                host = user_input.get("host", "")
-                port = user_input.get("port", 8080)
-                client_id = user_input.get(CONF_CLIENT_ID, "default")
-                api_key = user_input.get("api_key", "")
-                
-                # Test connection
+            device_index_str = user_input.get("device")
+            if device_index_str is not None:
+                try:
+                    device_index = int(device_index_str)
+                    if 0 <= device_index < len(self._discovered_devices):
+                        self._selected_device = self._discovered_devices[device_index]
+                        # Extract info from discovered device
+                        properties = self._selected_device.get("properties", {})
+                        host = self._selected_device.get("host", "")
+                        port = int(properties.get("port", self._selected_device.get("port", 8080)))
+                        client_id = properties.get("client_id", self._selected_device.get("name", "unknown"))
+                        
+                        # Check if password is required
+                        requires_password = properties.get("requires_password", "false").lower() == "true"
+                        
+                        if requires_password:
+                            # Go to password entry step
+                            return await self.async_step_password({
+                                "host": host,
+                                "port": port,
+                                "client_id": client_id
+                            })
+                        else:
+                            # No password required, create entry directly
+                            return await self.async_create_entry(
+                                title=f"OpenCtrol - {client_id}",
+                                data={
+                                    "host": host,
+                                    "port": port,
+                                    "client_id": client_id,
+                                    "password": "",
+                                    "base_url": f"http://{host}:{port}"
+                                }
+                            )
+                    else:
+                        errors["base"] = "invalid_device"
+                except (ValueError, TypeError):
+                    errors["base"] = "invalid_device"
+
+        # Show device selection form
+        device_options = {}
+        for idx, device in enumerate(self._discovered_devices):
+            properties = device.get("properties", {})
+            client_id = properties.get("client_id", device.get("name", "Unknown"))
+            host = device.get("host", "Unknown")
+            port = properties.get("port", device.get("port", 8080))
+            device_options[str(idx)] = f"{client_id} ({host}:{port})"
+
+        return self.async_show_form(
+            step_id="discovery",
+            data_schema=vol.Schema({
+                vol.Required("device"): vol.In(device_options)
+            }),
+            errors=errors,
+            description_placeholders={
+                "count": str(len(self._discovered_devices))
+            }
+        )
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle manual device entry."""
+        errors = {}
+        
+        if user_input is not None:
+            host = user_input.get("host", "").strip()
+            port = user_input.get("port", 8080)
+            client_id = user_input.get("client_id", host)
+            
+            if not host:
+                errors["host"] = "host_required"
+            else:
+                # Test connection and check if password is required
                 import aiohttp
                 base_url = f"http://{host}:{port}"
-                headers = {}
-                if api_key:
-                    headers["X-API-Key"] = api_key
                 
-                async with aiohttp.ClientSession() as session:
-                    try:
+                try:
+                    async with aiohttp.ClientSession() as session:
                         async with session.get(
                             f"{base_url}/api/v1/health",
-                            headers=headers,
                             timeout=aiohttp.ClientTimeout(total=5)
                         ) as response:
                             if response.status == 200:
-                                # Connection successful
-                                pass
-                            elif response.status == 401:
-                                errors["base"] = "invalid_auth"
+                                # Connection successful, check status for password requirement
+                                try:
+                                    status_data = await response.json()
+                                    # If we can access health, try status to see if password is needed
+                                    async with session.get(
+                                        f"{base_url}/api/v1/status",
+                                        timeout=aiohttp.ClientTimeout(total=5)
+                                    ) as status_response:
+                                        if status_response.status == 401:
+                                            # Password required
+                                            return await self.async_step_password({
+                                                "host": host,
+                                                "port": port,
+                                                "client_id": client_id
+                                            })
+                                        elif status_response.status == 200:
+                                            # No password required
+                                            return await self.async_create_entry(
+                                                title=f"OpenCtrol - {client_id}",
+                                                data={
+                                                    "host": host,
+                                                    "port": port,
+                                                    "client_id": client_id,
+                                                    "password": "",
+                                                    "base_url": base_url
+                                                }
+                                            )
+                                except:
+                                    # Assume password required if status check fails
+                                    return await self.async_step_password({
+                                        "host": host,
+                                        "port": port,
+                                        "client_id": client_id
+                                    })
                             else:
                                 errors["base"] = "cannot_connect"
-                    except aiohttp.ClientError:
-                        errors["base"] = "cannot_connect"
-                    except asyncio.TimeoutError:
-                        errors["base"] = "timeout"
-                
-                if not errors:
-                    # Create entry
-                    return self.async_create_entry(
-                        title=f"OpenCtrol - {client_id}",
-                        data=user_input,
-                    )
-            except CannotConnect:
+                except aiohttp.ClientError:
+                    errors["base"] = "cannot_connect"
+                except asyncio.TimeoutError:
+                    errors["base"] = "timeout"
+                except Exception as ex:
+                    _LOGGER.exception("Unexpected error during connection test")
+                    errors["base"] = "unknown"
+
+        return self.async_show_form(
+            step_id="manual",
+            data_schema=vol.Schema({
+                vol.Required("host"): str,
+                vol.Optional("port", default=8080): int,
+                vol.Optional("client_id", default=""): str,
+            }),
+            errors=errors,
+        )
+
+    async def async_step_password(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle password entry."""
+        errors = {}
+        
+        # Get device info from previous step
+        device_info = user_input or {}
+        host = device_info.get("host", "")
+        port = device_info.get("port", 8080)
+        client_id = device_info.get("client_id", host)
+        
+        if user_input is not None and "password" in user_input:
+            password = user_input.get("password", "")
+            
+            # Test connection with password
+            import aiohttp
+            base_url = f"http://{host}:{port}"
+            headers = {}
+            if password:
+                headers["X-Password"] = password
+            
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"{base_url}/api/v1/status",
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as response:
+                        if response.status == 200:
+                            # Password correct, create entry
+                            return await self.async_create_entry(
+                                title=f"OpenCtrol - {client_id}",
+                                data={
+                                    "host": host,
+                                    "port": port,
+                                    "client_id": client_id,
+                                    "password": password,
+                                    "base_url": base_url
+                                }
+                            )
+                        elif response.status == 401:
+                            errors["base"] = "invalid_auth"
+                        else:
+                            errors["base"] = "cannot_connect"
+            except aiohttp.ClientError:
                 errors["base"] = "cannot_connect"
+            except asyncio.TimeoutError:
+                errors["base"] = "timeout"
             except Exception as ex:
-                _LOGGER.exception("Unexpected error during config flow")
+                _LOGGER.exception("Unexpected error during password validation")
                 errors["base"] = "unknown"
 
         return self.async_show_form(
-            step_id="user",
+            step_id="password",
             data_schema=vol.Schema({
-                vol.Required("host"): str,
-                vol.Required("port", default=8080): int,
-                vol.Required(CONF_CLIENT_ID): str,
-                vol.Optional("api_key"): str,
+                vol.Required("password"): str,
             }),
             errors=errors,
+            description_placeholders={
+                "device": f"{client_id} ({host}:{port})"
+            }
         )
 
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
-

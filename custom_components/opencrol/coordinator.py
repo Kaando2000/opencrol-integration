@@ -31,9 +31,9 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
 
         # Get base URL from config
         base_url = entry.data.get("base_url", f"http://{entry.data.get('host', 'localhost')}:{entry.data.get('port', 8080)}")
-        api_key = entry.data.get("api_key")
+        password = entry.data.get("password")
 
-        self._http_client = OpenCtrolHttpClient(base_url, api_key)
+        self._http_client = OpenCtrolHttpClient(base_url, password)
 
         super().__init__(
             hass,
