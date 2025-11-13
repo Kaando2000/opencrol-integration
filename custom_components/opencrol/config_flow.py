@@ -185,17 +185,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                             "port": port,
                                             "client_id": client_id
                                         })
+                                    except aiohttp.ClientConnectorError as ex:
+                                        _LOGGER.error(f"Connection error checking status: {ex}")
+                                        errors["base"] = "cannot_connect"
+                                    except aiohttp.ServerTimeoutError as ex:
+                                        _LOGGER.error(f"Timeout checking status: {ex}")
+                                        errors["base"] = "timeout"
+                                    except asyncio.TimeoutError as ex:
+                                        _LOGGER.error(f"Request timeout checking status: {ex}")
+                                        errors["base"] = "timeout"
                                     except Exception as ex:
                                         _LOGGER.exception(f"Unexpected error checking status: {ex}")
-                                        # Show actual error message instead of generic "unknown"
-                                        error_msg = str(ex)
-                                        if "Connection" in error_msg or "connect" in error_msg.lower():
+                                        error_msg = str(ex).lower()
+                                        if "connection" in error_msg or "connect" in error_msg or "refused" in error_msg:
                                             errors["base"] = "cannot_connect"
-                                        elif "timeout" in error_msg.lower():
+                                        elif "timeout" in error_msg:
                                             errors["base"] = "timeout"
                                         else:
-                                            errors["base"] = "unknown"
-                                            _LOGGER.error(f"Unknown error type: {error_msg}")
+                                            errors["base"] = "cannot_connect"
+                                            _LOGGER.error(f"Unhandled error, treating as connection error: {error_msg}")
                                 else:
                                     _LOGGER.error(f"Health endpoint returned status: {health_response.status}")
                                     errors["base"] = "cannot_connect"
@@ -214,19 +222,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 except asyncio.TimeoutError:
                     _LOGGER.error("Connection timeout")
                     errors["base"] = "timeout"
+                except aiohttp.ClientConnectorError as ex:
+                    _LOGGER.error(f"Connection error: {ex}")
+                    errors["base"] = "cannot_connect"
+                except aiohttp.ServerTimeoutError as ex:
+                    _LOGGER.error(f"Server timeout: {ex}")
+                    errors["base"] = "timeout"
+                except asyncio.TimeoutError as ex:
+                    _LOGGER.error(f"Request timeout: {ex}")
+                    errors["base"] = "timeout"
                 except Exception as ex:
                     _LOGGER.exception(f"Unexpected error during connection test: {ex}")
-                    # Show actual error message instead of generic "unknown"
-                    error_msg = str(ex)
-                    if "Connection" in error_msg or "connect" in error_msg.lower() or "refused" in error_msg.lower():
+                    error_msg = str(ex).lower()
+                    error_type = type(ex).__name__
+                    _LOGGER.error(f"Error type: {error_type}, Message: {error_msg}")
+                    
+                    if "connection" in error_msg or "connect" in error_msg or "refused" in error_msg:
                         errors["base"] = "cannot_connect"
-                    elif "timeout" in error_msg.lower():
+                    elif "timeout" in error_msg:
                         errors["base"] = "timeout"
-                    elif "name resolution" in error_msg.lower() or "DNS" in error_msg:
+                    elif "name resolution" in error_msg or "dns" in error_msg:
                         errors["base"] = "cannot_connect"
                     else:
-                        errors["base"] = "unknown"
-                        _LOGGER.error(f"Unknown error type: {error_msg}")
+                        # Treat unknown errors as connection errors for better UX
+                        errors["base"] = "cannot_connect"
+                        _LOGGER.error(f"Unhandled error type: {error_type}, treating as connection error")
 
         return self.async_show_form(
             step_id="manual",
@@ -297,24 +317,49 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             errors["base"] = "cannot_connect"
             except aiohttp.ClientConnectorError as ex:
                 _LOGGER.error(f"Connection error during password validation: {ex}")
+                error_msg = str(ex).lower()
+                if "name resolution" in error_msg or "dns" in error_msg:
+                    errors["base"] = "cannot_connect"
+                elif "refused" in error_msg or "connection refused" in error_msg:
+                    errors["base"] = "cannot_connect"
+                else:
+                    errors["base"] = "cannot_connect"
+            except aiohttp.ServerTimeoutError as ex:
+                _LOGGER.error(f"Connection timeout during password validation: {ex}")
+                errors["base"] = "timeout"
+            except asyncio.TimeoutError as ex:
+                _LOGGER.error(f"Request timeout during password validation: {ex}")
+                errors["base"] = "timeout"
+            except aiohttp.ClientResponseError as ex:
+                _LOGGER.error(f"HTTP client response error: {ex.status} - {ex.message}")
+                if ex.status == 401:
+                    errors["base"] = "invalid_auth"
+                elif ex.status == 404:
+                    errors["base"] = "cannot_connect"
+                else:
+                    errors["base"] = "cannot_connect"
+            except aiohttp.ClientError as ex:
+                _LOGGER.error(f"HTTP client error during password validation: {ex}")
                 errors["base"] = "cannot_connect"
-            except aiohttp.ServerTimeoutError:
-                _LOGGER.error("Connection timeout during password validation")
-                errors["base"] = "timeout"
-            except asyncio.TimeoutError:
-                _LOGGER.error("Request timeout during password validation")
-                errors["base"] = "timeout"
             except Exception as ex:
                 _LOGGER.exception(f"Unexpected error during password validation: {ex}")
                 # Show actual error message instead of generic "unknown"
-                error_msg = str(ex)
-                if "Connection" in error_msg or "connect" in error_msg.lower() or "refused" in error_msg.lower():
+                error_msg = str(ex).lower()
+                error_type = type(ex).__name__
+                _LOGGER.error(f"Error type: {error_type}, Message: {error_msg}")
+                
+                if "connection" in error_msg or "connect" in error_msg or "refused" in error_msg:
                     errors["base"] = "cannot_connect"
-                elif "timeout" in error_msg.lower():
+                elif "timeout" in error_msg:
                     errors["base"] = "timeout"
+                elif "name resolution" in error_msg or "dns" in error_msg:
+                    errors["base"] = "cannot_connect"
+                elif "json" in error_msg or "decode" in error_msg:
+                    errors["base"] = "cannot_connect"
                 else:
-                    errors["base"] = "unknown"
-                    _LOGGER.error(f"Unknown error type during password validation: {error_msg}")
+                    # Last resort - but log the actual error
+                    errors["base"] = "cannot_connect"
+                    _LOGGER.error(f"Unhandled error type: {error_type}, treating as connection error")
 
         return self.async_show_form(
             step_id="password",
