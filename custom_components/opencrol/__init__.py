@@ -27,11 +27,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if www_dir.exists():
             # Register static path for card resources
             # Card will be available at: /local/opencrol/opencrol-remote-card.js
-            hass.http.register_static_path(
-                f"/local/opencrol",
-                str(www_dir),
-                cache_headers=False
-            )
+            # Try different methods based on Home Assistant version
+            try:
+                if hasattr(hass.http, 'register_static_path'):
+                    hass.http.register_static_path(
+                        f"/local/opencrol",
+                        str(www_dir),
+                        cache_headers=False
+                    )
+                elif hasattr(hass.http, 'app'):
+                    # Alternative: register with the app router
+                    from aiohttp import web
+                    hass.http.app.router.add_static(
+                        "/local/opencrol",
+                        str(www_dir)
+                    )
+                else:
+                    _LOGGER.warning("Could not register static path - card may need manual setup")
+            except AttributeError as ex:
+                _LOGGER.warning(f"Could not register static path: {ex} - card may need manual setup")
             
             # Auto-register card resource if frontend is available
             try:

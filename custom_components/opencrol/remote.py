@@ -26,8 +26,6 @@ class OpenCtrolRemote(CoordinatorEntity, RemoteEntity):
 
     _attr_supported_features = (
         RemoteEntityFeature.ACTIVITY
-        | RemoteEntityFeature.TURN_ON
-        | RemoteEntityFeature.TURN_OFF
     )
 
     def __init__(self, coordinator: OpenCtrolCoordinator, entry: ConfigEntry) -> None:
