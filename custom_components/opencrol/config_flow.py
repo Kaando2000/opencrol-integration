@@ -303,6 +303,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=vol.Schema({
                     vol.Required("password"): str,
                 }),
+                description_placeholders={"device": "OpenCtrol Device"},
                 errors=errors,
             )
         
