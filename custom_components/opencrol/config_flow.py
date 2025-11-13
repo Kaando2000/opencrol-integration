@@ -41,8 +41,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             try:
                 from . import discovery
+                from homeassistant.components import zeroconf
                 _LOGGER.info("Starting auto-discovery...")
-                self._discovered_devices = await discovery.discover_opencrol_devices()
+                # Get shared Zeroconf instance from Home Assistant
+                zeroconf_instance = await zeroconf.async_get_instance(self.hass)
+                self._discovered_devices = await discovery.discover_opencrol_devices(zeroconf_instance)
                 if self._discovered_devices:
                     _LOGGER.info(f"Discovered {len(self._discovered_devices)} OpenCtrol device(s)")
                     # Show discovered devices
@@ -175,8 +178,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                 # Status accessible - always proceed to password step
                                                 # User can leave password empty if no password is set
                                                 try:
+                                                    # status_response.json() is already a coroutine, await it
                                                     status_data = await status_response.json()
-                                                    actual_client_id = status_data.get('client_id', client_id)
+                                                    if isinstance(status_data, dict):
+                                                        actual_client_id = status_data.get('client_id', client_id)
+                                                    else:
+                                                        _LOGGER.warning(f"Unexpected response type: {type(status_data)}")
+                                                        actual_client_id = client_id
                                                     _LOGGER.info(f"Status accessible. Client ID: {actual_client_id}. Proceeding to password step.")
                                                     self._password_step_data = {
                                                         "host": host,
@@ -185,7 +193,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                                     }
                                                     return await self.async_step_password()
                                                 except Exception as json_ex:
-                                                    _LOGGER.error(f"Error parsing status JSON: {json_ex}")
+                                                    _LOGGER.error(f"Error parsing status JSON: {json_ex}", exc_info=True)
                                                     # Proceed to password step anyway with original client_id
                                                     self._password_step_data = {
                                                         "host": host,

@@ -44,12 +44,23 @@ class OpenCtrolListener(ServiceListener):
         pass
 
 
-async def discover_opencrol_devices() -> list[dict[str, Any]]:
-    """Discover OpenCtrol devices on the network."""
+async def discover_opencrol_devices(zeroconf_instance=None) -> list[dict[str, Any]]:
+    """Discover OpenCtrol devices on the network.
+    
+    Args:
+        zeroconf_instance: Optional shared Zeroconf instance from Home Assistant.
+                          If None, creates a new instance (not recommended in HA).
+    """
     devices = []
     
     try:
-        zeroconf = Zeroconf()
+        # Use shared instance if provided, otherwise create new one
+        if zeroconf_instance is not None:
+            zeroconf = zeroconf_instance
+            _LOGGER.debug("Using shared Zeroconf instance from Home Assistant")
+        else:
+            zeroconf = Zeroconf()
+            _LOGGER.warning("Creating new Zeroconf instance - should use shared instance in Home Assistant")
 
         def on_device_found(device_info):
             devices.append(device_info)
@@ -69,7 +80,9 @@ async def discover_opencrol_devices() -> list[dict[str, Any]]:
                 break
 
         browser.cancel()
-        zeroconf.close()
+        # Only close if we created the instance ourselves
+        if zeroconf_instance is None:
+            zeroconf.close()
         
         _LOGGER.info(f"Discovery complete. Found {len(devices)} device(s)")
     except Exception as ex:
