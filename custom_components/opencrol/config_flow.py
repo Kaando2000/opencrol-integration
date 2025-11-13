@@ -337,10 +337,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         if response.status == 200:
                             # Password correct (or no password required), create entry
                             try:
+                                # response.json() is already a coroutine, await it
                                 status_data = await response.json()
-                                actual_client_id = status_data.get('client_id', client_id)
+                                if isinstance(status_data, dict):
+                                    actual_client_id = status_data.get('client_id', client_id)
+                                else:
+                                    _LOGGER.warning(f"Unexpected response type: {type(status_data)}")
+                                    actual_client_id = client_id
                                 _LOGGER.info(f"Connection successful. Client ID: {actual_client_id}")
-                                return await self.async_create_entry(
+                                return self.async_create_entry(
                                     title=f"OpenCtrol - {actual_client_id}",
                                     data={
                                         "host": host,
@@ -351,7 +356,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     }
                                 )
                             except Exception as json_ex:
-                                _LOGGER.error(f"Error parsing JSON response: {json_ex}")
+                                _LOGGER.error(f"Error parsing JSON response: {json_ex}", exc_info=True)
                                 errors["base"] = "cannot_connect"
                         elif response.status == 401:
                             if password:
