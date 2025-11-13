@@ -324,7 +324,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             try:
                 _LOGGER.info(f"Validating password for {base_url}")
-                async with aiohttp.ClientSession() as session:
+                _LOGGER.debug(f"Password validation: host={host}, port={port}, base_url={base_url}, has_password={bool(password)}")
+                # Use TCPConnector for better connection handling
+                connector = aiohttp.TCPConnector(limit=10, limit_per_host=5, force_close=False)
+                async with aiohttp.ClientSession(connector=connector) as session:
                     async with session.get(
                         f"{base_url}/api/v1/status",
                         headers=headers,
