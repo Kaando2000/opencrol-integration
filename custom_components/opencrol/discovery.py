@@ -47,20 +47,28 @@ class OpenCtrolListener(ServiceListener):
 async def discover_opencrol_devices() -> list[dict[str, Any]]:
     """Discover OpenCtrol devices on the network."""
     devices = []
-    zeroconf = Zeroconf()
+    
+    try:
+        zeroconf = Zeroconf()
 
-    def on_device_found(device_info):
-        devices.append(device_info)
+        def on_device_found(device_info):
+            devices.append(device_info)
+            _LOGGER.info(f"Discovered device: {device_info.get('name')} at {device_info.get('host')}:{device_info.get('port')}")
 
-    listener = OpenCtrolListener(on_device_found)
-    browser = ServiceBrowser(zeroconf, "_opencrol._tcp.local.", listener)
+        listener = OpenCtrolListener(on_device_found)
+        browser = ServiceBrowser(zeroconf, "_opencrol._tcp.local.", listener)
 
-    # Wait a bit for discovery
-    import asyncio
-    await asyncio.sleep(2)
+        # Wait longer for discovery (mDNS can be slow)
+        import asyncio
+        _LOGGER.info("Searching for OpenCtrol devices on local network...")
+        await asyncio.sleep(5)  # Increased from 2 to 5 seconds
 
-    browser.cancel()
-    zeroconf.close()
+        browser.cancel()
+        zeroconf.close()
+        
+        _LOGGER.info(f"Discovery complete. Found {len(devices)} device(s)")
+    except Exception as ex:
+        _LOGGER.error(f"Error during mDNS discovery: {ex}", exc_info=True)
 
     return devices
 

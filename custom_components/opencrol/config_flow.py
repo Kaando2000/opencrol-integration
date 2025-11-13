@@ -39,13 +39,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             try:
                 from . import discovery
+                _LOGGER.info("Starting auto-discovery...")
                 self._discovered_devices = await discovery.discover_opencrol_devices()
                 if self._discovered_devices:
                     _LOGGER.info(f"Discovered {len(self._discovered_devices)} OpenCtrol device(s)")
                     # Show discovered devices
                     return await self.async_step_discovery()
+                else:
+                    _LOGGER.info("No devices discovered via mDNS, allowing manual entry")
             except Exception as ex:
-                _LOGGER.debug(f"Auto-discovery failed: {ex}")
+                _LOGGER.warning(f"Auto-discovery failed: {ex}, allowing manual entry")
 
         # If no devices found or user wants manual entry
         return await self.async_step_manual()
