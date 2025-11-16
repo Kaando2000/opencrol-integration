@@ -160,3 +160,14 @@ take_screenshot:
         entity:
           domain: media_player
 
+lock:
+  name: Lock Workstation
+  description: Lock the Windows workstation (Win+L equivalent)
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+

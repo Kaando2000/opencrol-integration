@@ -97,7 +97,8 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
 
         try:
             if command == "move_mouse":
-                return await self._http_client.move_mouse(kwargs.get("x", 0), kwargs.get("y", 0))
+                relative = kwargs.get("relative", False)
+                return await self._http_client.move_mouse(kwargs.get("x", 0), kwargs.get("y", 0), relative=relative)
             elif command == "click":
                 return await self._http_client.click(kwargs.get("button", "left"), kwargs.get("x"), kwargs.get("y"))
             elif command == "scroll":
@@ -125,9 +126,15 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
                 return result is not None and result.get("success", False)
             elif command == "restart":
                 return await self._http_client.restart_client()
+            elif command == "lock":
+                return await self._http_client.lock_workstation()
             elif command == "set_app_device":
                 return await self._http_client.set_app_device(
                     kwargs.get("process_id", 0),
+                    kwargs.get("device_id", "")
+                )
+            elif command == "set_default_device":
+                return await self._http_client.set_default_device(
                     kwargs.get("device_id", "")
                 )
             else:

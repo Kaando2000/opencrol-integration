@@ -49,20 +49,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             
             # Auto-register card resource if frontend is available
             try:
-                # Try to automatically add the card resource
-                frontend = hass.data.get("frontend")
-                if frontend:
-                    # Get the frontend store
-                    frontend_store = frontend.get("store")
-                    if frontend_store:
-                        # Add resource automatically
-                        card_url = "/local/opencrol/opencrol-remote-card.js"
-                        _LOGGER.info(f"Card available at: {card_url}")
-                        _LOGGER.info("Add this resource manually: Settings → Dashboards → Resources → Add Resource")
-                        _LOGGER.info(f"Resource URL: {card_url}")
-                        _LOGGER.info("Resource Type: JavaScript Module")
-            except Exception:
-                pass  # Frontend not available yet, user will add manually
+                # Try to automatically add the card resource to Lovelace
+                card_url = "/local/opencrol/opencrol-remote-card.js"
+                card_type = "module"
+                
+                # Try to get Lovelace resources manager
+                try:
+                    from homeassistant.components import lovelace
+                    lovelace_data = hass.data.get("lovelace")
+                    if lovelace_data:
+                        # Try to add resource programmatically
+                        try:
+                            resources = lovelace_data.get("resources")
+                            if resources:
+                                # Check if resource already exists
+                                existing = False
+                                async for resource in resources.async_items():
+                                    if resource.get("url") == card_url:
+                                        existing = True
+                                        break
+                                
+                                if not existing:
+                                    # Add resource
+                                    await resources.async_create_item({
+                                        "type": card_type,
+                                        "url": card_url
+                                    })
+                                    _LOGGER.info(f"Automatically added Lovelace card resource: {card_url}")
+                                else:
+                                    _LOGGER.debug(f"Lovelace card resource already exists: {card_url}")
+                        except Exception as lovelace_ex:
+                            _LOGGER.debug(f"Could not auto-add Lovelace resource (non-critical): {lovelace_ex}")
+                            _LOGGER.info(f"Card available at: {card_url} - add manually via Settings → Dashboards → Resources")
+                except ImportError:
+                    _LOGGER.debug("Lovelace component not available, card will be registered when frontend loads")
+                
+                _LOGGER.info(f"OpenCtrol remote card available at: {card_url}")
+                _LOGGER.info("Add to Lovelace: Settings → Dashboards → Resources → Add Resource")
+                _LOGGER.info(f"Resource URL: {card_url}, Type: JavaScript Module")
+            except Exception as ex:
+                _LOGGER.debug(f"Error auto-registering card resource (non-critical): {ex}")
+                _LOGGER.info("Card resource may need to be added manually via Lovelace Resources")
             
             _LOGGER.info(f"Registered OpenCtrol frontend resources from {www_dir}")
         else:

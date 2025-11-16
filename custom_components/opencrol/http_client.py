@@ -135,14 +135,23 @@ class OpenCtrolHttpClient:
             if response:
                 response.close()
 
-    async def move_mouse(self, x: int, y: int) -> bool:
-        """Move mouse cursor."""
+    async def move_mouse(self, x: int, y: int, relative: bool = False) -> bool:
+        """Move mouse cursor.
+        
+        Args:
+            x: X coordinate or delta (if relative=True)
+            y: Y coordinate or delta (if relative=True)
+            relative: If True, x and y are relative movement deltas (for touchpad mode)
+        """
         response = None
         try:
+            payload = {"x": x, "y": y}
+            if relative:
+                payload["relative"] = True
             response = await self._retry_request(
                 "POST",
                 f"{self.base_url}/api/v1/remotecontrol/mouse/move",
-                json={"x": x, "y": y}
+                json=payload
             )
             response.raise_for_status()
             data = await response.json()
@@ -330,6 +339,29 @@ class OpenCtrolHttpClient:
             if response:
                 response.close()
 
+    async def set_default_device(self, device_id: str) -> bool:
+        """Set system default audio device."""
+        response = None
+        try:
+            if not device_id:
+                _LOGGER.error("Device ID is required to set default device")
+                return False
+
+            response = await self._retry_request(
+                "POST",
+                f"{self.base_url}/api/v1/remotecontrol/audio/default-device",
+                json={"device_id": device_id}
+            )
+            response.raise_for_status()
+            data = await response.json()
+            return data.get("success", False)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            _LOGGER.error(f"Error setting default audio device: {ex}")
+            return False
+        finally:
+            if response:
+                response.close()
+
     async def select_monitor(self, monitor_index: int) -> bool:
         """Select monitor for screen capture."""
         response = None
@@ -427,6 +459,24 @@ class OpenCtrolHttpClient:
             return data.get("success", False)
         except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
             _LOGGER.error(f"Error restarting client: {ex}")
+            return False
+        finally:
+            if response:
+                response.close()
+
+    async def lock_workstation(self) -> bool:
+        """Lock the Windows workstation."""
+        response = None
+        try:
+            response = await self._retry_request(
+                "POST",
+                f"{self.base_url}/api/v1/system/lock"
+            )
+            response.raise_for_status()
+            data = await response.json()
+            return data.get("success", False)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            _LOGGER.error(f"Error locking workstation: {ex}")
             return False
         finally:
             if response:

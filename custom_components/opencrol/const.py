@@ -24,6 +24,7 @@ SERVICE_SEND_KEY = "send_key"
 SERVICE_SET_APP_VOLUME = "set_app_volume"
 SERVICE_SET_APP_DEVICE = "set_app_device"
 SERVICE_TAKE_SCREENSHOT = "take_screenshot"
+SERVICE_LOCK = "lock"
 
 # Attributes
 ATTR_X = "x"

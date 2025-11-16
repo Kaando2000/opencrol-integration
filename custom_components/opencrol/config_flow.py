@@ -434,6 +434,141 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
 
+    async def async_step_zeroconf(
+        self, discovery_info: dict[str, Any]
+    ) -> FlowResult:
+        """Handle automatic discovery via zeroconf."""
+        _LOGGER.info(f"OpenCtrol discovered via zeroconf: {discovery_info}")
+        
+        try:
+            # Extract service information
+            service_type = discovery_info.get("type", "")
+            properties = discovery_info.get("properties", {})
+            
+            # Get host - try multiple locations
+            host = (
+                discovery_info.get("host") 
+                or discovery_info.get("hostname", "") 
+                or discovery_info.get("hostname", "")
+            )
+            
+            # Parse IP from addresses if host is not available
+            if not host or host.endswith(".local"):
+                addresses = discovery_info.get("addresses", [])
+                if addresses:
+                    # Prefer IPv4
+                    for addr in addresses:
+                        if "." in str(addr) and ":" not in str(addr):
+                            host = str(addr)
+                            break
+                    if not host or "." not in host:
+                        host = str(addresses[0])
+            
+            # Get port from discovery info or properties
+            port = discovery_info.get("port")
+            if not port:
+                port_str = properties.get("port", "8080")
+                try:
+                    port = int(port_str)
+                except (ValueError, TypeError):
+                    port = 8080
+            
+            # Get client_id from properties or service name
+            client_id = (
+                properties.get("client_id", "") 
+                or properties.get("hostname", "") 
+                or host
+            )
+            
+            # Extract from service name if needed
+            if not client_id or client_id == host or client_id.endswith(".local"):
+                name = discovery_info.get("name", "")
+                if name:
+                    # Extract from "OpenCtrol_Hostname._opencrol._tcp.local."
+                    parts = name.split(".")
+                    if parts:
+                        service_name = parts[0]
+                        if service_name.startswith("OpenCtrol_"):
+                            client_id = service_name.replace("OpenCtrol_", "")
+                        elif "_" in service_name:
+                            client_id = service_name.split("_", 1)[1]
+                        else:
+                            client_id = service_name
+            
+            if not client_id or client_id.endswith(".local"):
+                client_id = host.split(".")[0] if "." in host else host
+            
+            # Check if password is required
+            requires_password = properties.get("requires_password", "false").lower() == "true"
+            
+            # Create unique_id to prevent duplicate entries
+            unique_id = f"{host}_{port}"
+            
+            # Normalize unique_id (remove .local, lowercase)
+            unique_id = unique_id.lower().replace(".local", "")
+            
+            # Check if we already have this entry
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_configured(
+                updates={
+                    "host": host,
+                    "port": port,
+                    "client_id": client_id
+                }
+            )
+            
+            # Store discovered device info for password step
+            self._selected_device = {
+                "host": host,
+                "port": port,
+                "client_id": client_id,
+                "properties": properties,
+                "requires_password": requires_password
+            }
+            
+            # Set context title for UI
+            self.context["title_placeholders"] = {
+                "name": client_id,
+                "host": host,
+                "port": str(port)
+            }
+            
+            # If password required, go to password step, otherwise create entry directly
+            if requires_password:
+                self._password_step_data = {
+                    "host": host,
+                    "port": port,
+                    "client_id": client_id
+                }
+                return await self.async_step_password()
+            else:
+                # No password required, create entry directly
+                return self.async_create_entry(
+                    title=f"OpenCtrol - {client_id}",
+                    data={
+                        "host": host,
+                        "port": port,
+                        "client_id": client_id,
+                        "password": "",
+                        "base_url": f"http://{host}:{port}"
+                    }
+                )
+                
+        except ImportError as ex:
+            # Integration not installed - show helpful error
+            _LOGGER.error(f"OpenCtrol integration not installed: {ex}")
+            return self.async_abort(
+                reason="integration_not_installed",
+                description_placeholders={
+                    "repo_url": "https://github.com/Kaando2000/opencrol-integration",
+                    "hacs_url": "https://hacs.xyz"
+                }
+            )
+        except Exception as ex:
+            _LOGGER.exception(f"Error processing zeroconf discovery: {ex}")
+            # Fall back to manual entry
+            return await self.async_step_manual()
+
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""

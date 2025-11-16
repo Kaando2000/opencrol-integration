@@ -14,6 +14,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
     super();
     this._screenStreamUrl = null;
     this._imgElement = null;
+    this._fullscreenOverlay = null;
   }
 
   setConfig(config) {
@@ -40,6 +41,12 @@ class OpenCtrolRemoteCard extends HTMLElement {
       this._imgElement.src = '';
       this._imgElement = null;
     }
+
+    // Remove fullscreen overlay if open
+    if (this._fullscreenOverlay && this._fullscreenOverlay.parentElement) {
+      this._fullscreenOverlay.parentElement.removeChild(this._fullscreenOverlay);
+      this._fullscreenOverlay = null;
+    }
   }
 
   updateCard() {
@@ -59,54 +66,108 @@ class OpenCtrolRemoteCard extends HTMLElement {
     const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entity);
     this._screenStreamUrl = baseUrl ? `${baseUrl}/api/v1/screenstream/stream` : null;
 
+    const clientId = attributes.client_id || entity.attributes.friendly_name || this.config.entity;
+
+    // Header controls: status dot, power, screens, sound, keyboard
     this.innerHTML = `
       <ha-card>
         <div class="card-header">
-          <div class="name">${entity.attributes.friendly_name || this.config.entity}</div>
-          <div class="status ${isOnline ? 'online' : 'offline'}">${isOnline ? 'Online' : 'Offline'}</div>
+          <div class="header-left">
+            <div class="status-dot ${isOnline ? 'online' : 'offline'}"></div>
+            <div class="name">${clientId}</div>
+          </div>
+          <div class="header-right">
+            <button class="header-btn power-btn" title="Power">
+              <span class="icon">⏻</span>
+            </button>
+            <div class="header-divider"></div>
+            <div class="screen-buttons" title="Screens">
+              ${(attributes.monitors || []).map((monitor, index) => `
+                <button class="header-btn screen-btn" data-monitor-index="${index}">
+                  ${index + 1}
+                </button>
+              `).join('')}
+            </div>
+            <div class="header-divider"></div>
+            <button class="header-btn sound-btn" title="Sound mixer">
+              <span class="icon">🔊</span>
+            </button>
+            <button class="header-btn keyboard-btn" title="Keyboard">
+              <span class="icon">⌨</span>
+            </button>
+          </div>
         </div>
         <div class="card-content">
-          ${isOnline && this._screenStreamUrl ? `
-            <div class="screen-container">
-              <img id="screen-stream" 
-                   src="${this._screenStreamUrl}" 
-                   alt="Screen Stream"
-                   class="screen-view">
-              <div class="screen-overlay" id="screen-overlay"></div>
-            </div>
-          ` : `
-            <div class="screen-placeholder">
-              <div class="placeholder-text">${isOnline ? 'Screen stream unavailable' : 'Device offline'}</div>
-            </div>
-          `}
-          
-          <div class="controls-panel">
-            <div class="control-section">
-              <div class="section-title">Mouse Control</div>
-              <div class="button-group">
-                <button class="control-btn" data-action="click" data-button="left">Left Click</button>
-                <button class="control-btn" data-action="click" data-button="right">Right Click</button>
-                <button class="control-btn" data-action="click" data-button="middle">Middle Click</button>
-                <button class="control-btn danger" data-action="secure_attention">Ctrl+Alt+Del</button>
+          <div class="touchpad-container ${isOnline ? 'touchpad-mode' : 'offline'}">
+            ${isOnline ? `
+              <div class="touchpad-placeholder" id="touchpad-placeholder">
+                <div class="touchpad-icon">🖱️</div>
+                <div class="touchpad-text">Touchpad Mode</div>
+                <div class="touchpad-hint">Move your finger to control the mouse</div>
               </div>
-            </div>
+            ` : `
+              <div class="screen-placeholder">
+                <div class="placeholder-text">Device offline</div>
+              </div>
+            `}
+          </div>
 
-            <div class="control-section">
+          <div class="controls-panel popups">
+            <div class="control-section keyboard-section">
               <div class="section-title">Keyboard</div>
               <div class="input-group">
                 <input type="text" id="text-input" placeholder="Type text here..." class="text-input">
                 <button class="control-btn" id="type-btn">Type</button>
               </div>
-              <div class="button-group">
-                <button class="control-btn small" data-action="send_key" data-key="Enter">Enter</button>
-                <button class="control-btn small" data-action="send_key" data-key="Escape">Esc</button>
-                <button class="control-btn small" data-action="send_key" data-key="Tab">Tab</button>
-                <button class="control-btn small" data-action="send_key" data-keys="Ctrl+C">Ctrl+C</button>
-                <button class="control-btn small" data-action="send_key" data-keys="Ctrl+V">Ctrl+V</button>
+              <div class="keyboard-grid">
+                <div class="keyboard-row">
+                  <button class="keyboard-key" data-key="ESC">Esc</button>
+                  <button class="keyboard-key" data-key="F1">F1</button>
+                  <button class="keyboard-key" data-key="F2">F2</button>
+                  <button class="keyboard-key" data-key="F3">F3</button>
+                  <button class="keyboard-key" data-key="F4">F4</button>
+                  <button class="keyboard-key" data-key="F5">F5</button>
+                  <button class="keyboard-key" data-key="F6">F6</button>
+                  <button class="keyboard-key" data-key="F7">F7</button>
+                  <button class="keyboard-key" data-key="F8">F8</button>
+                  <button class="keyboard-key" data-key="F9">F9</button>
+                  <button class="keyboard-key" data-key="F10">F10</button>
+                  <button class="keyboard-key" data-key="F11">F11</button>
+                  <button class="keyboard-key" data-key="F12">F12</button>
+                </div>
+                <div class="keyboard-row">
+                  <button class="keyboard-key toggle" data-key="CTRL">Ctrl</button>
+                  <button class="keyboard-key toggle" data-key="ALT">Alt</button>
+                  <button class="keyboard-key toggle" data-key="SHIFT">Shift</button>
+                  <button class="keyboard-key toggle" data-key="WIN">Win</button>
+                  <button class="keyboard-key" data-key="TAB">Tab</button>
+                  <button class="keyboard-key" data-key="CAPS_LOCK">Caps</button>
+                  <button class="keyboard-key" data-key="SPACE">Space</button>
+                  <button class="keyboard-key" data-key="ENTER">Enter</button>
+                </div>
+                <div class="keyboard-row">
+                  <button class="keyboard-key" data-key="INSERT">Ins</button>
+                  <button class="keyboard-key" data-key="DELETE">Del</button>
+                  <button class="keyboard-key" data-key="HOME">Home</button>
+                  <button class="keyboard-key" data-key="END">End</button>
+                  <button class="keyboard-key" data-key="PAGEUP">PgUp</button>
+                  <button class="keyboard-key" data-key="PAGEDOWN">PgDn</button>
+                  <button class="keyboard-key" data-key="UP">↑</button>
+                  <button class="keyboard-key" data-key="LEFT">←</button>
+                  <button class="keyboard-key" data-key="DOWN">↓</button>
+                  <button class="keyboard-key" data-key="RIGHT">→</button>
+                </div>
+                <div class="keyboard-row">
+                  <button class="keyboard-key" data-keys="CTRL+ALT+DEL">Ctrl+Alt+Del</button>
+                  <button class="keyboard-key" data-keys="ALT+TAB">Alt+Tab</button>
+                  <button class="keyboard-key" data-keys="CTRL+C">Ctrl+C</button>
+                  <button class="keyboard-key" data-keys="CTRL+V">Ctrl+V</button>
+                  <button class="keyboard-key" data-keys="CTRL+SHIFT+ESC">TaskMgr</button>
+                </div>
               </div>
             </div>
 
-            <div class="control-section">
+            <div class="control-section sound-section">
               <div class="section-title">Volume Control</div>
               <div class="volume-control">
                 <input type="range" id="volume-slider" min="0" max="100" 
@@ -115,19 +176,6 @@ class OpenCtrolRemoteCard extends HTMLElement {
                 <span id="volume-value" class="volume-value">${Math.round((attributes.master_volume || 0) * 100)}%</span>
               </div>
             </div>
-
-            ${attributes.monitors && attributes.monitors.length > 1 ? `
-            <div class="control-section">
-              <div class="section-title">Monitor Selection</div>
-              <select id="monitor-select" class="monitor-select">
-                ${attributes.monitors.map((monitor, index) => `
-                  <option value="${index}" ${monitor.primary ? 'selected' : ''}>
-                    Monitor ${index + 1}${monitor.primary ? ' (Primary)' : ''} - ${monitor.bounds.width}x${monitor.bounds.height}
-                  </option>
-                `).join('')}
-              </select>
-            </div>
-            ` : ''}
           </div>
         </div>
       </ha-card>
@@ -155,59 +203,216 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 
   setupScreenInteraction() {
-    if (!this._screenStreamUrl) return;
-
     const screenOverlay = this.querySelector('#screen-overlay');
     const screenImg = this.querySelector('#screen-stream');
+    const touchpadPlaceholder = this.querySelector('#touchpad-placeholder');
+    const screenContainer = this.querySelector('.screen-container');
+    const placeholder = this.querySelector('.screen-placeholder');
     
-    if (!screenOverlay || !screenImg) return;
+    // Determine if we're in touchpad mode (screen off/unavailable)
+    const isTouchpadMode = !screenImg || screenImg.style.display === 'none' || 
+                          (screenContainer && screenContainer.classList.contains('touchpad-mode')) ||
+                          (placeholder && placeholder.classList.contains('touchpad-mode'));
+    
+    if (isTouchpadMode) {
+      // Touchpad mode - use relative movement
+      this.setupTouchpadMode(screenOverlay || placeholder || screenContainer);
+    } else if (screenOverlay && screenImg) {
+      // Screen mode - use absolute coordinates
+      this._imgElement = screenImg;
 
-    this._imgElement = screenImg;
-
-    // Handle clicks on screen
-    screenOverlay.addEventListener('click', (e) => {
-      const rect = screenImg.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-      const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-      
-      this.sendCommand('click', { 
-        button: 'left', 
-        x: x, 
-        y: y 
-      });
-    });
-
-    // Handle right-click
-    screenOverlay.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      const rect = screenImg.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-      const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-      
-      this.sendCommand('click', { 
-        button: 'right', 
-        x: x, 
-        y: y 
-      });
-    });
-
-    // Handle mouse movement for visual feedback
-    let isDragging = false;
-    screenOverlay.addEventListener('mousedown', () => { isDragging = true; });
-    screenOverlay.addEventListener('mouseup', () => { isDragging = false; });
-    screenOverlay.addEventListener('mousemove', (e) => {
-      if (isDragging) {
+      // Handle clicks on screen
+      screenOverlay.addEventListener('click', (e) => {
         const rect = screenImg.getBoundingClientRect();
         const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
         const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
         
-        this.sendCommand('move_mouse', { x: x, y: y });
+        this.sendCommand('click', { 
+          button: 'left', 
+          x: x, 
+          y: y 
+        });
+      });
+
+      // Handle right-click
+      screenOverlay.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const rect = screenImg.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
+        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
+        
+        this.sendCommand('click', { 
+          button: 'right', 
+          x: x, 
+          y: y 
+        });
+      });
+
+      // Handle mouse movement for visual feedback
+      let isDragging = false;
+      screenOverlay.addEventListener('mousedown', () => { isDragging = true; });
+      screenOverlay.addEventListener('mouseup', () => { isDragging = false; });
+      screenOverlay.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const rect = screenImg.getBoundingClientRect();
+          const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
+          const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
+          
+          this.sendCommand('move_mouse', { x: x, y: y });
+        }
+      });
+
+      // Check for screen stream errors (screen off)
+      screenImg.addEventListener('error', () => {
+        screenImg.style.display = 'none';
+        if (screenContainer) screenContainer.classList.add('touchpad-mode');
+        if (touchpadPlaceholder) touchpadPlaceholder.style.display = 'flex';
+        this.setupTouchpadMode(screenContainer || placeholder);
+      });
+    }
+  }
+
+  setupTouchpadMode(container) {
+    if (!container) return;
+
+    let lastX = null;
+    let lastY = null;
+    let isDown = false;
+
+    // Touchpad-style relative movement
+    container.addEventListener('mousedown', (e) => {
+      isDown = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+    });
+
+    container.addEventListener('mouseup', () => {
+      isDown = false;
+      lastX = null;
+      lastY = null;
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (isDown && lastX !== null && lastY !== null) {
+        const deltaX = e.clientX - lastX;
+        const deltaY = e.clientY - lastY;
+        
+        // Use scroll command for relative movement (common API pattern)
+        // Or implement relative move_mouse_delta if available
+        // For now, convert to absolute movement estimate
+        this.sendCommand('move_mouse', { 
+          x: Math.round(deltaX * 2), // Scale factor for touchpad sensitivity
+          y: Math.round(deltaY * 2),
+          relative: true // Hint that this is relative movement
+        });
+        
+        lastX = e.clientX;
+        lastY = e.clientY;
+      }
+    });
+
+    // Handle clicks in touchpad mode (tap to click)
+    container.addEventListener('click', (e) => {
+      if (!isDown || (lastX === null && lastY === null)) {
+        // Single tap - left click
+        this.sendCommand('click', { button: 'left' });
+      }
+    });
+
+    // Touch support for mobile
+    container.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      isDown = true;
+    });
+
+    container.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (!isDown || lastX === null) {
+        // Tap detected
+        this.sendCommand('click', { button: 'left' });
+      }
+      isDown = false;
+      lastX = null;
+      lastY = null;
+    });
+
+    container.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (isDown && lastX !== null && lastY !== null) {
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - lastX;
+        const deltaY = touch.clientY - lastY;
+        
+        this.sendCommand('move_mouse', { 
+          x: Math.round(deltaX * 2),
+          y: Math.round(deltaY * 2),
+          relative: true
+        });
+        
+        lastX = touch.clientX;
+        lastY = touch.clientY;
       }
     });
   }
 
   attachEventHandlers() {
-    // Volume slider
+    // Header buttons
+    const powerBtn = this.querySelector('.power-btn');
+    if (powerBtn && this._hass && this.config?.entity) {
+      powerBtn.addEventListener('click', () => {
+        // Use dedicated lock service for safe \"power\" action (lock workstation)
+        this._hass.callService('opencrol', 'lock', {
+          entity_id: this.config.entity,
+        });
+      });
+    }
+
+    // Screen buttons - select monitor and open full-screen stream
+    const screenButtons = this.querySelectorAll('.screen-btn');
+    screenButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const index = parseInt(btn.dataset.monitorIndex);
+        const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
+        if (!baseUrl || Number.isNaN(index)) return;
+
+        // Mark active button
+        screenButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Ask backend to switch monitor
+        fetch(`${baseUrl}/api/v1/screen/monitor/${index}`, {
+          method: 'POST'
+        }).catch(() => {});
+
+        // Open full-screen remote desktop overlay
+        this.openFullscreenRemote(baseUrl, index);
+      });
+    });
+
+    // Sound / keyboard popups
+    const soundBtn = this.querySelector('.sound-btn');
+    if (soundBtn) {
+      soundBtn.addEventListener('click', () => {
+        this.classList.toggle('show-sound');
+      });
+    }
+
+    const keyboardBtn = this.querySelector('.keyboard-btn');
+    if (keyboardBtn) {
+      keyboardBtn.addEventListener('click', () => {
+        this.classList.toggle('show-keyboard');
+        if (this.classList.contains('show-keyboard')) {
+          const textInput = this.querySelector('#text-input');
+          if (textInput) {
+            textInput.focus();
+          }
+        }
+      });
+    }
+    // Volume slider (master volume)
     const volumeSlider = this.querySelector('#volume-slider');
     if (volumeSlider) {
       volumeSlider.addEventListener('input', (e) => {
@@ -237,7 +442,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
       });
     }
 
-    // Control buttons
+    // Control buttons (legacy small controls inside popups)
     this.querySelectorAll('.control-btn[data-action]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const action = btn.dataset.action;
@@ -259,14 +464,60 @@ class OpenCtrolRemoteCard extends HTMLElement {
       });
     });
 
-    // Monitor selector
-    const monitorSelect = this.querySelector('#monitor-select');
-    if (monitorSelect) {
-      monitorSelect.addEventListener('change', (e) => {
-        const monitorIndex = parseInt(e.target.value);
-        this.sendCommand('select_monitor', { monitor_index: monitorIndex });
+    // Keyboard grid keys with toggle/combination support
+    this._activeModifiers = this._activeModifiers || new Set();
+
+    const updateModifierStyles = () => {
+      this.querySelectorAll('.keyboard-key.toggle').forEach(btn => {
+        const key = (btn.dataset.key || '').toUpperCase();
+        if (this._activeModifiers.has(key)) {
+          btn.classList.add('toggled');
+        } else {
+          btn.classList.remove('toggled');
+        }
       });
-    }
+    };
+
+    this.querySelectorAll('.keyboard-key').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = (btn.dataset.key || '').toUpperCase();
+        const combo = btn.dataset.keys;
+        const isToggle = btn.classList.contains('toggle');
+
+        if (combo) {
+          // Explicit combination button (e.g., Ctrl+Alt+Del)
+          this.sendCommand('send_key', { keys: combo });
+          // Clear any active modifiers after explicit combo
+          this._activeModifiers.clear();
+          updateModifierStyles();
+          return;
+        }
+
+        if (!key && !combo) {
+          return;
+        }
+
+        if (isToggle && key) {
+          // Toggle modifier state; actual combo will be sent when another key is pressed
+          if (this._activeModifiers.has(key)) {
+            this._activeModifiers.delete(key);
+          } else {
+            this._activeModifiers.add(key);
+          }
+          updateModifierStyles();
+        } else if (key) {
+          // Non-modifier: combine with any active modifiers and send as one combo
+          const mods = Array.from(this._activeModifiers);
+          const parts = [...mods, key];
+          const keysString = parts.join('+');
+          this.sendCommand('send_key', { keys: keysString });
+          // Clear modifiers after use
+          this._activeModifiers.clear();
+          updateModifierStyles();
+        }
+      });
+    });
+
   }
 
   sendCommand(service, data = {}) {

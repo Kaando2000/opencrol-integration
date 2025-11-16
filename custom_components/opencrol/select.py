@@ -49,7 +49,7 @@ class OpenCtrolOutputDevice(SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Set output device."""
-        await self.coordinator.send_command("set_output_device", {ATTR_DEVICE_ID: option})
+        await self.coordinator.send_command("set_default_device", device_id=option)
 
     async def async_update(self) -> None:
         """Update device list and current selection."""

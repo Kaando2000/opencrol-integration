@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
-from .const import DOMAIN
+from .const import DOMAIN, SERVICE_LOCK
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,6 +81,10 @@ SERVICE_SCHEMA_STOP_SCREEN_CAPTURE = vol.Schema({
 SERVICE_SCHEMA_SEND_TO_SECURE_DESKTOP = vol.Schema({
     vol.Required("entity_id"): cv.entity_id,
     vol.Required("text"): cv.string,
+})
+
+SERVICE_SCHEMA_LOCK = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
 })
 
 
@@ -198,6 +202,14 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if coordinator:
             await coordinator.send_command("send_to_secure_desktop", text=text)
 
+    async def handle_lock(call: ServiceCall) -> None:
+        """Handle lock service call."""
+        entity_id = call.data["entity_id"]
+
+        coordinator = _get_coordinator(hass, entity_id)
+        if coordinator:
+            await coordinator.send_command("lock")
+
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE_MOUSE, handle_move_mouse, schema=SERVICE_SCHEMA_MOVE_MOUSE
     )
@@ -233,6 +245,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TO_SECURE_DESKTOP, handle_send_to_secure_desktop, schema=SERVICE_SCHEMA_SEND_TO_SECURE_DESKTOP
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_LOCK, handle_lock, schema=SERVICE_SCHEMA_LOCK
     )
 
 

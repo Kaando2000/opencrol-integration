@@ -14,8 +14,10 @@ Custom Home Assistant integration for controlling Windows PCs remotely via HTTP 
 - **Audio Management**: Master and per-application volume control
 - **Multi-Monitor Support**: Switch between multiple displays
 - **Secure Desktop**: Control Windows login screen and secure scenarios
-- **Custom Lovelace Card**: Integrated UI with screen view and controls (auto-installed)
-- **Auto-Discovery**: Automatic device discovery via mDNS/Bonjour
+- **Custom Lovelace Card**: Integrated UI with screen view and controls (automatically added to resources)
+- **Auto-Discovery**: Automatic device discovery via mDNS/Bonjour - appears in "Discovered" section
+- **Touchpad Mode**: Automatically switches to touchpad controls when screen stream is unavailable
+- **Login Screen Support**: Full control including screen capture and input at Windows login screen (AnyDesk-like)
 
 ## Installation
 
@@ -29,7 +31,7 @@ Custom Home Assistant integration for controlling Windows PCs remotely via HTTP 
 6. Click **Install**
 7. Restart Home Assistant
 
-The integration will automatically register the Lovelace card. After restart, add the card resource:
+The integration will automatically register and add the Lovelace card resource. If manual setup is needed:
 
 1. Go to **Settings** → **Dashboards** → **Resources**
 2. Click **"+ ADD RESOURCE"**
@@ -59,9 +61,17 @@ The integration will automatically register the Lovelace card. After restart, ad
 
 The integration will automatically validate the connection before saving.
 
-### Auto-Discovery
+### Plug-and-Play Auto-Discovery
 
-If your Windows PC is running OpenCtrol with mDNS enabled, the integration will attempt to discover it automatically when you add the integration.
+OpenCtrol supports true plug-and-play installation:
+
+1. **Install OpenCtrol on Windows PC** - Start the client as Administrator
+2. **Home Assistant automatically discovers** - Device appears in Settings → Devices & Services → "Discovered" section
+3. **Click "Configure"** - If integration not installed, you'll be prompted to install via HACS
+4. **Automatic configuration** - Integration configures automatically from discovery data
+5. **Lovelace card added** - Card resource is automatically added to your dashboard
+
+The integration uses mDNS/Zeroconf to discover devices even before installation, making setup seamless.
 
 ## Usage
 

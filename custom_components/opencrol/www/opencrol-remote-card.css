@@ -16,28 +16,84 @@ opencrol-remote-card .card-header {
   border-bottom: 1px solid var(--divider-color, #e0e0e0);
 }
 
+opencrol-remote-card .header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 opencrol-remote-card .card-header .name {
   font-weight: bold;
   font-size: 1.2em;
   color: var(--primary-text-color, #212121);
 }
 
-opencrol-remote-card .card-header .status {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-opencrol-remote-card .card-header .status.online {
-  background-color: #4caf50;
-  color: white;
-}
-
-opencrol-remote-card .card-header .status.offline {
+opencrol-remote-card .status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background-color: #f44336;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+opencrol-remote-card .status-dot.online {
+  background-color: #4caf50;
+}
+
+opencrol-remote-card .header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+opencrol-remote-card .header-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--primary-text-color, #212121);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+}
+
+opencrol-remote-card .header-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+opencrol-remote-card .header-btn.power-btn {
+  color: #f44336;
+}
+
+opencrol-remote-card .screen-buttons {
+  display: inline-flex;
+  gap: 2px;
+}
+
+opencrol-remote-card .header-btn.screen-btn {
+  font-size: 0.8em;
+  font-weight: 600;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+}
+
+opencrol-remote-card .header-btn.screen-btn.active {
+  background-color: var(--primary-color, #03a9f4);
   color: white;
+}
+
+opencrol-remote-card .header-btn .icon {
+  line-height: 1;
+}
+
+opencrol-remote-card .header-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--divider-color, #e0e0e0);
+  margin: 0 4px;
 }
 
 opencrol-remote-card .card-content {
@@ -45,64 +101,137 @@ opencrol-remote-card .card-content {
   flex-direction: column;
 }
 
-opencrol-remote-card .screen-container {
-  position: relative;
-  width: 100%;
-  background-color: #000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px;
-  max-height: 600px;
-  overflow: hidden;
-}
-
-opencrol-remote-card .screen-view {
-  max-width: 100%;
-  max-height: 600px;
-  object-fit: contain;
-  display: block;
-  cursor: crosshair;
-}
-
-opencrol-remote-card .screen-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  cursor: crosshair;
-  z-index: 1;
-}
-
-opencrol-remote-card .screen-placeholder {
+opencrol-remote-card .touchpad-container {
   width: 100%;
   min-height: 300px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #f5f5f5;
-  color: #999;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
 opencrol-remote-card .placeholder-text {
   font-size: 1.1em;
 }
 
-opencrol-remote-card .controls-panel {
-  padding: 16px;
-  background-color: var(--card-background-color, #fff);
+/* Fullscreen overlay for remote desktop */
+.opencrol-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-height: 400px;
-  overflow-y: auto;
+  z-index: 9999;
+}
+
+.opencrol-fullscreen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  color: #fff;
+}
+
+.opencrol-fullscreen-title {
+  font-size: 1em;
+  font-weight: 500;
+}
+
+.opencrol-fullscreen-close {
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 1.4em;
+  cursor: pointer;
+}
+
+.opencrol-fullscreen-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.opencrol-fullscreen-screen-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.opencrol-fullscreen-screen {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.opencrol-fullscreen-overlay-layer {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+opencrol-remote-card .controls-panel {
+  padding: 12px 16px 16px;
+  background-color: var(--card-background-color, #fff);
+}
+
+opencrol-remote-card .controls-panel.popups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 opencrol-remote-card .control-section {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 8px;
+}
+
+opencrol-remote-card.show-keyboard .keyboard-section {
+  display: flex;
+}
+
+opencrol-remote-card.show-sound .sound-section {
+  display: flex;
+}
+
+opencrol-remote-card .keyboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+opencrol-remote-card .keyboard-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+
+opencrol-remote-card .keyboard-key {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 0.7em;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--secondary-background-color, #e0e0e0);
+  color: var(--primary-text-color, #212121);
+  cursor: pointer;
+}
+
+opencrol-remote-card .keyboard-key.toggle.toggled {
+  background-color: var(--primary-color, #03a9f4);
+  color: #fff;
+}
+
+opencrol-remote-card .keyboard-key:active {
+  filter: brightness(0.95);
 }
 
 opencrol-remote-card .section-title {
@@ -232,5 +361,44 @@ opencrol-remote-card .error {
   padding: 16px;
   color: #f44336;
   text-align: center;
+}
+
+opencrol-remote-card .touchpad-placeholder {
+  width: 100%;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  cursor: pointer;
+  user-select: none;
+}
+
+opencrol-remote-card .touchpad-icon {
+  font-size: 4em;
+  margin-bottom: 16px;
+}
+
+opencrol-remote-card .touchpad-text {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+opencrol-remote-card .touchpad-hint {
+  font-size: 0.9em;
+  opacity: 0.9;
+  text-align: center;
+}
+
+opencrol-remote-card .screen-container.touchpad-mode {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+opencrol-remote-card .screen-placeholder.touchpad-mode {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 

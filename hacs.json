@@ -3,6 +3,11 @@
   "render_readme": true,
   "domains": ["opencrol"],
   "iot_class": "Local Push",
-  "homeassistant": "2024.1.0"
+  "homeassistant": "2024.1.0",
+  "hide_default_branch": false,
+  "zip_release": true,
+  "filename": "opencrol.zip",
+  "hacs": "1.6.0",
+  "persistent_directory": "custom_components/opencrol"
 }
 
