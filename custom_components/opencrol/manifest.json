@@ -4,12 +4,11 @@
   "codeowners": ["@Kaando2000"],
   "config_flow": true,
   "dependencies": [],
-  "zeroconf": ["_opencrol._tcp.local."],
   "documentation": "https://github.com/Kaando2000/opencrol-integration",
   "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/Kaando2000/opencrol-integration/issues",
-  "requirements": ["aiohttp>=3.8.0", "zeroconf>=0.131.0"],
+  "requirements": ["aiohttp>=3.8.0"],
   "version": "2.1.0",
   "after_dependencies": ["frontend"],
   "import_executor": false
