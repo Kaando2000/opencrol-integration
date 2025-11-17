@@ -58,7 +58,18 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
             self._available = status_data.get("online", False)
 
             # Get monitors
-            monitors = await self._http_client.get_monitors()
+            monitors_data = await self._http_client.get_monitors()
+            
+            # Extract monitors list and current_monitor
+            monitors = []
+            current_monitor = 0
+            if isinstance(monitors_data, dict):
+                monitors = monitors_data.get("monitors", [])
+                current_monitor = monitors_data.get("current_monitor", 0)
+            elif isinstance(monitors_data, list):
+                monitors = monitors_data
+                # Get current monitor from status endpoint if available
+                current_monitor = status_data.get("current_monitor", 0)
 
             # Get audio apps and devices
             try:
@@ -71,10 +82,13 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
 
             return {
                 "status": STATE_ONLINE if self._available else STATE_OFFLINE,
-                "monitors": monitors.get("monitors", []) if isinstance(monitors, dict) else monitors,
+                "monitors": monitors,
+                "current_monitor": current_monitor,
+                "total_monitors": len(monitors),
                 "audio_apps": audio_apps,
                 "audio_devices": audio_devices,
                 "capabilities": status_data.get("capabilities", {}),
+                "master_volume": status_data.get("master_volume", 0.0),
             }
         except ConnectionError as ex:
             _LOGGER.warning(f"Connection error: {ex}")

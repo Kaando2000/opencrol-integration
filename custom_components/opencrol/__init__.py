@@ -117,6 +117,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 card_url = "/local/opencrol/opencrol-remote-card.js"
             card_type = "module"
             
+            # Store card_url for use in nested function (fix scope issue)
+            final_card_url = card_url
+            
             # Delay resource registration to ensure frontend is loaded
             async def _register_card_resource():
                 try:

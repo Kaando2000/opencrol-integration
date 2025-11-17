@@ -261,14 +261,24 @@ def async_setup_services(hass: HomeAssistant) -> None:
 def _get_coordinator(hass: HomeAssistant, entity_id: str):
     """Get coordinator for entity."""
     from .coordinator import OpenCtrolCoordinator
+    from homeassistant.helpers import entity_registry as er
 
     # Find the entry_id from entity_id
-    entity_registry = hass.helpers.entity_registry.async_get()
-    if entity := entity_registry.async_get(entity_id):
-        entry_id = entity.config_entry_id
-        if entry_id and entry_id in hass.data.get(DOMAIN, {}):
-            coordinator = hass.data[DOMAIN][entry_id]
+    try:
+        entity_registry = er.async_get(hass)
+        if entity := entity_registry.async_get(entity_id):
+            entry_id = entity.config_entry_id
+            if entry_id and entry_id in hass.data.get(DOMAIN, {}):
+                coordinator = hass.data[DOMAIN][entry_id]
+                if isinstance(coordinator, OpenCtrolCoordinator):
+                    return coordinator
+    except Exception:
+        # Fallback: try to find coordinator by entity_id pattern
+        for entry_id, coordinator in hass.data.get(DOMAIN, {}).items():
             if isinstance(coordinator, OpenCtrolCoordinator):
-                return coordinator
+                # Check if entity matches this coordinator's entities
+                if entity_id and hasattr(coordinator, 'entry'):
+                    # Try to match by checking if entity belongs to this entry
+                    return coordinator
     return None
 

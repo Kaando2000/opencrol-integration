@@ -54,9 +54,12 @@ class OpenCtrolRemote(CoordinatorEntity, RemoteEntity):
             "client_id": self.entry.data.get("client_id"),
             "base_url": base_url,
             "monitors": self.coordinator.data.get("monitors", []),
+            "current_monitor": self.coordinator.data.get("current_monitor", 0),
+            "total_monitors": self.coordinator.data.get("total_monitors", 0),
             "audio_apps": self.coordinator.data.get("audio_apps", []),
             "audio_devices": self.coordinator.data.get("audio_devices", []),
             "capabilities": self.coordinator.data.get("capabilities", {}),
+            "master_volume": self.coordinator.data.get("master_volume", 0.0),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:

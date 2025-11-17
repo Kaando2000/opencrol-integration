@@ -115,7 +115,7 @@ class OpenCtrolHttpClient:
             if response:
                 response.close()
 
-    async def get_monitors(self) -> list[dict[str, Any]]:
+    async def get_monitors(self) -> dict[str, Any] | list[dict[str, Any]]:
         """Get available monitors."""
         response = None
         try:
@@ -123,11 +123,13 @@ class OpenCtrolHttpClient:
             response.raise_for_status()
             data = await response.json()
             # API returns {monitors: [...], current_monitor: 0, total_monitors: 3}
-            # Return just the monitors list for compatibility
+            # Return full dict to preserve current_monitor information
             if isinstance(data, dict) and "monitors" in data:
-                return data.get("monitors", [])
-            # Fallback if response is already a list
-            return data if isinstance(data, list) else []
+                return data  # Return full dict with monitors, current_monitor, total_monitors
+            # Fallback if response is already a list (for backward compatibility)
+            if isinstance(data, list):
+                return {"monitors": data, "current_monitor": 0, "total_monitors": len(data)}
+            return {"monitors": [], "current_monitor": 0, "total_monitors": 0}
         except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
             _LOGGER.error(f"Error getting monitors: {ex}")
             raise

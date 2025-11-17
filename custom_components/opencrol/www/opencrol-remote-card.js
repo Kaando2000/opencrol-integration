@@ -89,9 +89,16 @@ class OpenCtrolRemoteCard extends HTMLElement {
     const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entity);
     this._screenStreamUrl = baseUrl ? `${baseUrl}/api/v1/screenstream/stream` : null;
 
-    const clientId = attributes.client_id || entity.attributes.friendly_name || this.config.entity;
+    const clientId = attributes.client_id || entity.attributes?.friendly_name || this.config.entity;
     const monitors = attributes.monitors || [];
     const currentMonitor = attributes.current_monitor !== undefined ? attributes.current_monitor : 0;
+    const masterVolume = attributes.master_volume !== undefined ? Math.round(attributes.master_volume * 100) : 0;
+    const audioApps = attributes.audio_apps || [];
+    const audioDevices = attributes.audio_devices || [];
+    const defaultDeviceId = attributes.default_output_device || (audioDevices.length > 0 ? audioDevices[0].id : '');
+
+    // Determine if we should show screen stream (always try, fallback to touchpad)
+    const shouldShowStream = isOnline && this._screenStreamUrl;
 
     // Header controls: status dot, power, screens, sound, keyboard
     this.innerHTML = `
@@ -126,26 +133,26 @@ class OpenCtrolRemoteCard extends HTMLElement {
           </div>
         </div>
         <div class="card-content">
-          <div class="screen-container ${!isOnline ? 'offline' : ''}">
-            ${isOnline && this._screenStreamUrl ? `
+          <div class="screen-container ${!isOnline ? 'offline' : ''}" id="screen-container">
+            ${shouldShowStream ? `
               <div class="screen-wrapper">
                 <img id="screen-stream" 
                      src="${this._screenStreamUrl}" 
                      alt="Screen Stream"
                      class="screen-stream"
-                     loading="lazy">
-                <div id="screen-overlay" class="screen-overlay"></div>
-                <button class="fullscreen-btn" title="Fullscreen" aria-label="Open Fullscreen">
+                     loading="eager"
+                     style="display: none;">
+                <div id="screen-overlay" class="screen-overlay" style="display: none;"></div>
+                <button class="fullscreen-btn" title="Fullscreen" aria-label="Open Fullscreen" style="display: none;">
                   <ha-icon icon="mdi:fullscreen"></ha-icon>
                 </button>
               </div>
-            ` : `
-              <div class="touchpad-placeholder ${isOnline ? '' : 'offline'}" id="touchpad-placeholder">
-                <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
-                <div class="touchpad-text">${isOnline ? 'Touchpad Mode' : 'Device Offline'}</div>
-                <div class="touchpad-hint">${isOnline ? 'Move your finger to control the mouse' : 'Waiting for connection...'}</div>
-              </div>
-            `}
+            ` : ''}
+            <div class="touchpad-placeholder ${isOnline ? '' : 'offline'}" id="touchpad-placeholder">
+              <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
+              <div class="touchpad-text">${isOnline ? 'Touchpad Mode' : 'Device Offline'}</div>
+              <div class="touchpad-hint">${isOnline ? 'Move your finger to control the mouse' : 'Waiting for connection...'}</div>
+            </div>
           </div>
 
           <div class="controls-panel popups">
@@ -220,12 +227,32 @@ class OpenCtrolRemoteCard extends HTMLElement {
               <div class="volume-control">
                 <ha-icon icon="mdi:volume-low" class="volume-icon"></ha-icon>
                 <input type="range" id="volume-slider" min="0" max="100" 
-                       value="${Math.round((attributes.master_volume || 0) * 100)}" 
+                       value="${masterVolume}" 
                        class="volume-slider" 
-                       aria-label="Volume">
+                       aria-label="Master Volume">
                 <ha-icon icon="mdi:volume-high" class="volume-icon"></ha-icon>
-                <span id="volume-value" class="volume-value">${Math.round((attributes.master_volume || 0) * 100)}%</span>
+                <span id="volume-value" class="volume-value">${masterVolume}%</span>
               </div>
+              <div class="section-title app-volume-title">App Volumes</div>
+              <div class="app-volume-list">
+                ${audioApps.length > 0 ? audioApps.map(app => `
+                  <div class="app-volume-item">
+                    <span class="app-name" title="${this._escapeHtml(app.name || 'Unknown')}">${this._escapeHtml(app.name || 'Unknown')}</span>
+                    <input type="range" class="app-volume-slider" min="0" max="100" 
+                           value="${Math.round((app.volume || 0) * 100)}" 
+                           data-process-id="${app.process_id || 0}" aria-label="${this._escapeHtml(app.name || 'Unknown')} Volume">
+                    <span class="app-volume-value">${Math.round((app.volume || 0) * 100)}%</span>
+                  </div>
+                `).join('') : '<div class="no-apps">No audio apps detected</div>'}
+              </div>
+              <div class="section-title device-selection-title">Output Devices</div>
+              <select id="output-device-select" class="monitor-select" aria-label="Select Output Device">
+                ${audioDevices.map(device => `
+                  <option value="${device.id}" ${device.id === defaultDeviceId ? 'selected' : ''}>
+                    ${this._escapeHtml(device.name || device.id)}
+                  </option>
+                `).join('')}
+              </select>
             </div>
           </div>
         </div>
@@ -356,15 +383,40 @@ class OpenCtrolRemoteCard extends HTMLElement {
       }
     });
 
-    // Check for screen stream errors (screen off)
+    // Handle screen stream load/error
+    screenImg.addEventListener('load', () => {
+      // Stream loaded successfully - show it
+      screenImg.style.display = 'block';
+      if (screenOverlay) screenOverlay.style.display = 'block';
+      const fullscreenBtn = this.querySelector('.fullscreen-btn');
+      if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
+      if (touchpadPlaceholder) touchpadPlaceholder.style.display = 'none';
+    });
+    
     screenImg.addEventListener('error', () => {
+      // Stream failed - show touchpad
       screenImg.style.display = 'none';
-      if (screenContainer) screenContainer.classList.add('touchpad-mode');
+      if (screenOverlay) screenOverlay.style.display = 'none';
+      const fullscreenBtn = this.querySelector('.fullscreen-btn');
+      if (fullscreenBtn) fullscreenBtn.style.display = 'none';
       if (touchpadPlaceholder) {
         touchpadPlaceholder.style.display = 'flex';
         this.setupTouchpadMode(touchpadPlaceholder);
       }
     });
+    
+    // Start screen capture when image is loaded
+    if (screenImg.complete && screenImg.naturalWidth > 0) {
+      screenImg.dispatchEvent(new Event('load'));
+    } else {
+      // Start screen capture explicitly
+      const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
+      if (baseUrl && this.config.entity) {
+        this._hass.callService('opencrol', 'start_screen_capture', {
+          entity_id: this.config.entity,
+        }).catch(() => {});
+      }
+    }
 
     // Fullscreen button
     const fullscreenBtn = this.querySelector('.fullscreen-btn');
@@ -490,28 +542,35 @@ class OpenCtrolRemoteCard extends HTMLElement {
       });
     }
 
-    // Screen buttons - select monitor and open full-screen stream
+    // Screen buttons - select monitor and start screen capture
     const screenButtons = this.querySelectorAll('.screen-btn');
     screenButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const index = parseInt(btn.dataset.monitorIndex);
         const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
-        if (!baseUrl || Number.isNaN(index)) return;
+        if (!baseUrl || Number.isNaN(index) || !this.config.entity) return;
 
         // Mark active button
         screenButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        // Ask backend to switch monitor
-        fetch(`${baseUrl}/api/v1/status/monitors/${index}/select`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        // Switch monitor and start screen capture
+        this._hass.callService('opencrol', 'select_monitor', {
+          entity_id: this.config.entity,
+          monitor_index: index,
+        }).catch(() => {});
+        
+        // Start screen capture if not already active
+        this._hass.callService('opencrol', 'start_screen_capture', {
+          entity_id: this.config.entity,
         }).catch(() => {});
 
-        // Open full-screen remote desktop overlay
-        this.openFullscreenRemote(baseUrl, index);
+        // Refresh screen stream URL
+        const screenImg = this.querySelector('#screen-stream');
+        if (screenImg && this._screenStreamUrl) {
+          // Force reload by adding timestamp
+          screenImg.src = this._screenStreamUrl + (this._screenStreamUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        }
       });
     });
 
@@ -565,6 +624,37 @@ class OpenCtrolRemoteCard extends HTMLElement {
         volumeTimeout = setTimeout(() => {
           this.sendCommand('set_volume', { volume: value / 100 });
         }, 100);
+      });
+    }
+
+    // App volume sliders
+    this.querySelectorAll('.app-volume-slider').forEach(slider => {
+      let appVolumeTimeout = null;
+      slider.addEventListener('input', (e) => {
+        const value = e.target.value;
+        const processId = parseInt(e.target.dataset.processId);
+        const appVolumeValue = e.target.parentElement.querySelector('.app-volume-value');
+        if (appVolumeValue) {
+          appVolumeValue.textContent = value + '%';
+        }
+        
+        // Debounce app volume changes
+        clearTimeout(appVolumeTimeout);
+        appVolumeTimeout = setTimeout(() => {
+          this.sendCommand('set_app_volume', { 
+            process_id: processId, 
+            volume: value / 100 
+          });
+        }, 100);
+      });
+    });
+
+    // Output device selector
+    const outputDeviceSelect = this.querySelector('#output-device-select');
+    if (outputDeviceSelect) {
+      outputDeviceSelect.addEventListener('change', (e) => {
+        const deviceId = e.target.value;
+        this.sendCommand('set_system_default_device', { device_id: deviceId });
       });
     }
 

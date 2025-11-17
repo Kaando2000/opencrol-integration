@@ -541,6 +541,85 @@ opencrol-remote-card .monitor-select:focus {
   border-color: var(--primary-color, #03a9f4);
 }
 
+opencrol-remote-card .app-volume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+opencrol-remote-card .app-volume-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+opencrol-remote-card .app-name {
+  flex-shrink: 0;
+  width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.85em;
+  color: var(--primary-text-color, #212121);
+}
+
+opencrol-remote-card .app-volume-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--divider-color, #e0e0e0);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+opencrol-remote-card .app-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-color, #ff9800);
+  cursor: pointer;
+}
+
+opencrol-remote-card .app-volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-color, #ff9800);
+  cursor: pointer;
+  border: none;
+}
+
+opencrol-remote-card .app-volume-value {
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.85em;
+  color: var(--primary-text-color, #212121);
+}
+
+opencrol-remote-card .no-apps {
+  text-align: center;
+  color: var(--secondary-text-color, #757575);
+  font-size: 0.9em;
+  padding: 16px;
+}
+
+opencrol-remote-card .app-volume-title,
+opencrol-remote-card .device-selection-title {
+  font-weight: 600;
+  font-size: 0.85em;
+  color: var(--secondary-text-color, #757575);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
 opencrol-remote-card .error {
   padding: 24px;
   color: #f44336;

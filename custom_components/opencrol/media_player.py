@@ -65,6 +65,9 @@ class OpenCtrolScreenViewer(
             "stream_url": f"{base_url}/api/v1/screenstream/stream",
             "frame_url": f"{base_url}/api/v1/screenstream/frame",
             "monitors": self.coordinator.data.get("monitors", []),
+            "current_monitor": self.coordinator.data.get("current_monitor", 0),
+            "total_monitors": self.coordinator.data.get("total_monitors", 0),
+            "master_volume": self.coordinator.data.get("master_volume", 0.0),
         }
 
     async def async_turn_on(self) -> None:
