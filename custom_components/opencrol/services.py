@@ -20,6 +20,9 @@ SERVICE_SECURE_ATTENTION = "secure_attention"
 SERVICE_SET_VOLUME = "set_volume"
 SERVICE_SET_APP_VOLUME = "set_app_volume"
 SERVICE_SELECT_MONITOR = "select_monitor"
+SERVICE_START_SCREEN_CAPTURE = "start_screen_capture"
+SERVICE_STOP_SCREEN_CAPTURE = "stop_screen_capture"
+SERVICE_SEND_TO_SECURE_DESKTOP = "send_to_secure_desktop"
 
 SERVICE_SCHEMA_MOVE_MOUSE = vol.Schema({
     vol.Required("entity_id"): cv.entity_id,
@@ -91,6 +94,10 @@ SERVICE_SCHEMA_LOCK = vol.Schema({
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Set up services for OpenCtrol."""
+    # Check if services are already registered to avoid duplicates
+    if hass.services.has_service(DOMAIN, SERVICE_MOVE_MOUSE):
+        _LOGGER.debug("OpenCtrol services already registered, skipping")
+        return
 
     async def handle_move_mouse(call: ServiceCall) -> None:
         """Handle move_mouse service call."""
