@@ -2,12 +2,18 @@
 // Version: 2.1.0
 // Auto-loaded by OpenCtrol Integration
 
-// Load CSS
-const link = document.createElement('link');
-link.rel = 'stylesheet';
-link.type = 'text/css';
-link.href = '/local/opencrol/opencrol-remote-card.css';
-document.head.appendChild(link);
+(function() {
+  'use strict';
+
+  // Load CSS (only once, check if already loaded)
+  const cssHref = '/local/opencrol/opencrol-remote-card.css';
+  if (!document.querySelector(`link[href="${cssHref}"]`)) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.type = 'text/css';
+    link.href = cssHref;
+    document.head.appendChild(link);
+  }
 
 class OpenCtrolRemoteCard extends HTMLElement {
   constructor() {
@@ -17,10 +23,6 @@ class OpenCtrolRemoteCard extends HTMLElement {
     this._fullscreenOverlay = null;
     this._activeModifiers = new Set();
     this._isFullscreenOpen = false;
-  }
-
-  static getConfigElement() {
-    return document.createElement('opencrol-remote-card-editor');
   }
 
   static getStubConfig() {
@@ -759,10 +761,21 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 }
 
-customElements.define('opencrol-remote-card', OpenCtrolRemoteCard);
+// Define the custom element BEFORE registration
+if (!customElements.get('opencrol-remote-card')) {
+  customElements.define('opencrol-remote-card', OpenCtrolRemoteCard);
+}
 
 // Card registration for Home Assistant card picker
-if (window.customCards) {
+// Initialize window.customCards if it doesn't exist
+window.customCards = window.customCards || [];
+
+// Check if card is already registered
+const cardAlreadyRegistered = window.customCards.some(
+  card => card.type === 'custom:opencrol-remote-card'
+);
+
+if (!cardAlreadyRegistered) {
   window.customCards.push({
     type: 'custom:opencrol-remote-card',
     name: 'OpenCtrol Remote',
@@ -771,4 +784,26 @@ if (window.customCards) {
     documentationURL: 'https://github.com/Kaando2000/opencrol-integration',
     author: 'Kaando2000'
   });
+  
+  // Log card registration for debugging
+  console.log('OpenCtrol Remote card registered:', {
+    type: 'custom:opencrol-remote-card',
+    element: 'opencrol-remote-card',
+    customCards: window.customCards.length
+  });
+} else {
+  console.log('OpenCtrol Remote card already registered');
 }
+
+// Also register with Lovelace if available
+if (window.loadCardHelpers) {
+  window.loadCardHelpers().then(({ createCardElement }) => {
+    // Card is now available
+    console.log('OpenCtrol Remote card loaded successfully');
+  }).catch(err => {
+    console.error('Error loading OpenCtrol card helpers:', err);
+  });
+}
+
+})(); // End IIFE
+
