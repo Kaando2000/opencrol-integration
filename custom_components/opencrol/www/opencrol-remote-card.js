@@ -99,8 +99,9 @@ class OpenCtrolRemoteCard extends HTMLElement {
 
     // Determine if we should show screen stream (always try, fallback to touchpad)
     const shouldShowStream = isOnline && this._screenStreamUrl;
+    const isScreenCaptureActive = attributes.screen_capture_active !== undefined ? attributes.screen_capture_active : false;
 
-    // Header controls: status dot, power, screens, sound, keyboard
+    // Header controls: status dot, power on/off, screens, sound, keyboard
     this.innerHTML = `
       <ha-card>
         <div class="card-header">
@@ -109,7 +110,15 @@ class OpenCtrolRemoteCard extends HTMLElement {
             <div class="name">${this._escapeHtml(clientId)}</div>
           </div>
           <div class="header-right">
-            <button class="header-btn power-btn" title="Lock Workstation" aria-label="Lock Workstation">
+            ${isOnline ? `
+              <button class="header-btn power-on-btn" title="Turn On Screen Capture" aria-label="Turn On">
+                <ha-icon icon="mdi:power"></ha-icon>
+              </button>
+              <button class="header-btn power-off-btn" title="Turn Off Screen Capture" aria-label="Turn Off">
+                <ha-icon icon="mdi:power-off"></ha-icon>
+              </button>
+            ` : ''}
+            <button class="header-btn power-btn" title="Lock Workstation" aria-label="Lock">
               <ha-icon icon="mdi:lock"></ha-icon>
             </button>
             <div class="header-divider"></div>
@@ -121,7 +130,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
                         title="Switch to Monitor ${index + 1}">
                   ${index + 1}
                 </button>
-              `).join('') : '<span class="no-monitors">No monitors</span>'}
+              `).join('') : '<span class="no-monitors">-</span>'}
             </div>
             <div class="header-divider"></div>
             <button class="header-btn sound-btn" title="Sound Mixer" aria-label="Sound Mixer">
@@ -148,7 +157,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
                 </button>
               </div>
             ` : ''}
-            <div class="touchpad-placeholder ${isOnline ? '' : 'offline'}" id="touchpad-placeholder">
+            <div class="touchpad-placeholder ${isOnline ? '' : 'offline'}" id="touchpad-placeholder" style="display: ${shouldShowStream && isScreenCaptureActive ? 'none' : 'flex'};">
               <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
               <div class="touchpad-text">${isOnline ? 'Touchpad Mode' : 'Device Offline'}</div>
               <div class="touchpad-hint">${isOnline ? 'Move your finger to control the mouse' : 'Waiting for connection...'}</div>
@@ -383,14 +392,23 @@ class OpenCtrolRemoteCard extends HTMLElement {
       }
     });
 
+    // Always setup touchpad mode first (always available when online)
+    if (touchpadPlaceholder && isOnline) {
+      this.setupTouchpadMode(touchpadPlaceholder);
+    }
+
     // Handle screen stream load/error
     screenImg.addEventListener('load', () => {
-      // Stream loaded successfully - show it
-      screenImg.style.display = 'block';
-      if (screenOverlay) screenOverlay.style.display = 'block';
-      const fullscreenBtn = this.querySelector('.fullscreen-btn');
-      if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
-      if (touchpadPlaceholder) touchpadPlaceholder.style.display = 'none';
+      // Stream loaded successfully - show it, hide touchpad
+      if (screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
+        screenImg.style.display = 'block';
+        if (screenOverlay) screenOverlay.style.display = 'block';
+        const fullscreenBtn = this.querySelector('.fullscreen-btn');
+        if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
+        if (touchpadPlaceholder) {
+          touchpadPlaceholder.style.display = 'none';
+        }
+      }
     });
     
     screenImg.addEventListener('error', () => {
@@ -401,21 +419,25 @@ class OpenCtrolRemoteCard extends HTMLElement {
       if (fullscreenBtn) fullscreenBtn.style.display = 'none';
       if (touchpadPlaceholder) {
         touchpadPlaceholder.style.display = 'flex';
-        this.setupTouchpadMode(touchpadPlaceholder);
       }
     });
     
-    // Start screen capture when image is loaded
-    if (screenImg.complete && screenImg.naturalWidth > 0) {
-      screenImg.dispatchEvent(new Event('load'));
-    } else {
-      // Start screen capture explicitly
+    // Try to start screen capture if online
+    if (isOnline && this.config.entity) {
       const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
-      if (baseUrl && this.config.entity) {
-        this._hass.callService('opencrol', 'start_screen_capture', {
-          entity_id: this.config.entity,
-        }).catch(() => {});
+      if (baseUrl) {
+        // Start screen capture explicitly
+        setTimeout(() => {
+          this._hass.callService('opencrol', 'start_screen_capture', {
+            entity_id: this.config.entity,
+          }).catch(() => {});
+        }, 500);
       }
+    }
+    
+    // Check if image already loaded
+    if (screenImg.complete && screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
+      screenImg.dispatchEvent(new Event('load'));
     }
 
     // Fullscreen button
@@ -532,13 +554,48 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 
   attachEventHandlers() {
-    // Header buttons
+    // Power on/off buttons
+    const powerOnBtn = this.querySelector('.power-on-btn');
+    if (powerOnBtn && this._hass && this.config?.entity) {
+      powerOnBtn.addEventListener('click', () => {
+        // Turn on screen capture using media_player entity
+        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+        if (this._hass.states[mediaEntityId]) {
+          this._hass.callService('media_player', 'turn_on', {
+            entity_id: mediaEntityId,
+          }).catch(() => {
+            // Fallback to service call
+            this.sendCommand('start_screen_capture');
+          });
+        } else {
+          this.sendCommand('start_screen_capture');
+        }
+      });
+    }
+
+    const powerOffBtn = this.querySelector('.power-off-btn');
+    if (powerOffBtn && this._hass && this.config?.entity) {
+      powerOffBtn.addEventListener('click', () => {
+        // Turn off screen capture using media_player entity
+        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+        if (this._hass.states[mediaEntityId]) {
+          this._hass.callService('media_player', 'turn_off', {
+            entity_id: mediaEntityId,
+          }).catch(() => {
+            // Fallback to service call
+            this.sendCommand('stop_screen_capture');
+          });
+        } else {
+          this.sendCommand('stop_screen_capture');
+        }
+      });
+    }
+
+    // Lock button
     const powerBtn = this.querySelector('.power-btn');
     if (powerBtn && this._hass && this.config?.entity) {
       powerBtn.addEventListener('click', () => {
-        this._hass.callService('opencrol', 'lock', {
-          entity_id: this.config.entity,
-        });
+        this.sendCommand('lock');
       });
     }
 
@@ -577,22 +634,38 @@ class OpenCtrolRemoteCard extends HTMLElement {
     // Sound / keyboard popups with close buttons
     const soundBtn = this.querySelector('.sound-btn');
     if (soundBtn) {
-      soundBtn.addEventListener('click', () => {
-        this.classList.toggle('show-sound');
+      soundBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isShowing = this.classList.contains('show-sound');
+        // Close keyboard if open
         if (this.classList.contains('show-keyboard')) {
           this.classList.remove('show-keyboard');
+        }
+        // Toggle sound menu
+        if (isShowing) {
+          this.classList.remove('show-sound');
+        } else {
+          this.classList.add('show-sound');
         }
       });
     }
 
     const keyboardBtn = this.querySelector('.keyboard-btn');
     if (keyboardBtn) {
-      keyboardBtn.addEventListener('click', () => {
-        this.classList.toggle('show-keyboard');
+      keyboardBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isShowing = this.classList.contains('show-keyboard');
+        // Close sound if open
         if (this.classList.contains('show-sound')) {
           this.classList.remove('show-sound');
         }
-        if (this.classList.contains('show-keyboard')) {
+        // Toggle keyboard menu
+        if (isShowing) {
+          this.classList.remove('show-keyboard');
+        } else {
+          this.classList.add('show-keyboard');
           const textInput = this.querySelector('#text-input');
           if (textInput) {
             setTimeout(() => textInput.focus(), 100);
@@ -691,7 +764,10 @@ class OpenCtrolRemoteCard extends HTMLElement {
     };
 
     this.querySelectorAll('.keyboard-key').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
         const key = (btn.dataset.key || '').toUpperCase();
         const combo = btn.dataset.keys;
         const isToggle = btn.classList.contains('toggle');

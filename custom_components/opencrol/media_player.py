@@ -53,6 +53,24 @@ class OpenCtrolScreenViewer(
         return self.coordinator.last_update_success and self.coordinator.data.get("status") == "online"
 
     @property
+    def state(self) -> str:
+        """Return the state of the device."""
+        if not self.coordinator.last_update_success:
+            return MediaPlayerState.OFF
+
+        data = self.coordinator.data
+        status = data.get("status", "offline")
+        
+        if status == "offline":
+            return MediaPlayerState.OFF
+        
+        # Check if screen capture is active
+        screen_capture_active = data.get("screen_capture_active", False)
+        if screen_capture_active:
+            return MediaPlayerState.PLAYING
+        return MediaPlayerState.IDLE
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the state attributes."""
         host = self.entry.data.get("host", "localhost")

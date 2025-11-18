@@ -89,6 +89,7 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
                 "audio_devices": audio_devices,
                 "capabilities": status_data.get("capabilities", {}),
                 "master_volume": status_data.get("master_volume", 0.0),
+                "screen_capture_active": status_data.get("screen_capture_active", False),
             }
         except ConnectionError as ex:
             _LOGGER.warning(f"Connection error: {ex}")

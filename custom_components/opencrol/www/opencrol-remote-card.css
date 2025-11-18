@@ -91,6 +91,22 @@ opencrol-remote-card .header-btn.power-btn:hover {
   background-color: rgba(244, 67, 54, 0.1);
 }
 
+opencrol-remote-card .header-btn.power-on-btn {
+  color: #4caf50;
+}
+
+opencrol-remote-card .header-btn.power-on-btn:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+opencrol-remote-card .header-btn.power-off-btn {
+  color: #ff9800;
+}
+
+opencrol-remote-card .header-btn.power-off-btn:hover {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
 opencrol-remote-card .screen-buttons {
   display: inline-flex;
   gap: 2px;
