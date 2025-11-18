@@ -1,6 +1,6 @@
 // OpenCtrol Remote Card for Home Assistant Lovelace
-// Version: 2.1.0
-// Auto-loaded by OpenCtrol Integration
+// Version: 3.0.0
+// Complete redesign with big touchpad
 
 (function() {
   'use strict';
@@ -49,8 +49,11 @@ class OpenCtrolRemoteCard extends HTMLElement {
 
   connectedCallback() {
     this.updateCard();
-    // Close fullscreen on ESC key
-    document.addEventListener('keydown', this._handleEscKey.bind(this));
+    // Close fullscreen on ESC key (only add once)
+    if (!this._escKeyHandler) {
+      this._escKeyHandler = this._handleEscKey.bind(this);
+      document.addEventListener('keydown', this._escKeyHandler);
+    }
   }
 
   disconnectedCallback() {
@@ -59,11 +62,16 @@ class OpenCtrolRemoteCard extends HTMLElement {
       this._imgElement.src = '';
       this._imgElement = null;
     }
-
-    // Remove fullscreen overlay if open
     this.closeFullscreenRemote();
-    
-    document.removeEventListener('keydown', this._handleEscKey.bind(this));
+    // Remove event listeners
+    if (this._escKeyHandler) {
+      document.removeEventListener('keydown', this._escKeyHandler);
+      this._escKeyHandler = null;
+    }
+    if (this._outsideClickHandler) {
+      document.removeEventListener('click', this._outsideClickHandler);
+      this._outsideClickHandler = null;
+    }
   }
 
   _handleEscKey(e) {
@@ -81,68 +89,74 @@ class OpenCtrolRemoteCard extends HTMLElement {
       return;
     }
 
-    const state = entity.state;
     const attributes = entity.attributes || {};
-    const isOnline = state === 'on' || state === 'online';
+    
+    // Get status from coordinator data via attributes (not entity state)
+    // The coordinator exposes status in attributes.status
+    const status = attributes.status || 'offline';
+    const isOnline = status === 'online';
+    
+    // Get all monitor-related data first
+    const monitors = attributes.monitors || [];
+    const currentMonitor = attributes.current_monitor !== undefined ? attributes.current_monitor : 0;
     
     // Get base URL from entity attributes or config
     const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entity);
-    this._screenStreamUrl = baseUrl ? `${baseUrl}/api/v1/screenstream/stream` : null;
+    // Always include monitor parameter (0 is default)
+    const monitorParam = `?monitor=${currentMonitor}`;
+    this._screenStreamUrl = baseUrl ? `${baseUrl}/api/v1/screenstream/stream${monitorParam}` : null;
 
     const clientId = attributes.client_id || entity.attributes?.friendly_name || this.config.entity;
-    const monitors = attributes.monitors || [];
-    const currentMonitor = attributes.current_monitor !== undefined ? attributes.current_monitor : 0;
     const masterVolume = attributes.master_volume !== undefined ? Math.round(attributes.master_volume * 100) : 0;
     const audioApps = attributes.audio_apps || [];
     const audioDevices = attributes.audio_devices || [];
     const defaultDeviceId = attributes.default_output_device || (audioDevices.length > 0 ? audioDevices[0].id : '');
-
-    // Determine if we should show screen stream (always try, fallback to touchpad)
-    const shouldShowStream = isOnline && this._screenStreamUrl;
     const isScreenCaptureActive = attributes.screen_capture_active !== undefined ? attributes.screen_capture_active : false;
+    const shouldShowStream = isOnline && this._screenStreamUrl && isScreenCaptureActive;
 
-    // Header controls: status dot, power on/off, screens, sound, keyboard
+    // New compact title bar with icons only
     this.innerHTML = `
       <ha-card>
-        <div class="card-header">
-          <div class="header-left">
-            <div class="status-dot ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}"></div>
-            <div class="name">${this._escapeHtml(clientId)}</div>
+        <div class="card-header-compact">
+          <div class="header-left-compact">
+            <div class="status-icon ${isOnline ? 'online' : 'offline'}" title="${isOnline ? 'Online' : 'Offline'}">
+              <ha-icon icon="${isOnline ? 'mdi:circle' : 'mdi:circle-outline'}"></ha-icon>
+            </div>
+            <div class="client-name">${this._escapeHtml(clientId)}</div>
           </div>
-          <div class="header-right">
+          <div class="header-icons-compact">
             ${isOnline ? `
-              <button class="header-btn power-on-btn" title="Turn On Screen Capture" aria-label="Turn On">
+              <button class="icon-btn ${isScreenCaptureActive ? 'active' : ''}" id="power-on-btn" title="Turn On Screen">
                 <ha-icon icon="mdi:power"></ha-icon>
               </button>
-              <button class="header-btn power-off-btn" title="Turn Off Screen Capture" aria-label="Turn Off">
+              <button class="icon-btn ${!isScreenCaptureActive ? 'active' : ''}" id="power-off-btn" title="Turn Off Screen">
                 <ha-icon icon="mdi:power-off"></ha-icon>
               </button>
             ` : ''}
-            <button class="header-btn power-btn" title="Lock Workstation" aria-label="Lock">
-              <ha-icon icon="mdi:lock"></ha-icon>
-            </button>
-            <div class="header-divider"></div>
-            <div class="screen-buttons" title="Monitor Selection">
+            <div class="monitor-icons" title="Monitor Selection">
               ${monitors.length > 0 ? monitors.map((monitor, index) => `
-                <button class="header-btn screen-btn ${index === currentMonitor ? 'active' : ''}" 
+                <button class="icon-btn monitor-icon ${index === currentMonitor ? 'active' : ''}" 
                         data-monitor-index="${index}" 
-                        aria-label="Monitor ${index + 1}"
-                        title="Switch to Monitor ${index + 1}">
+                        title="Monitor ${index + 1}">
                   ${index + 1}
                 </button>
-              `).join('') : '<span class="no-monitors">-</span>'}
+              `).join('') : ''}
             </div>
-            <div class="header-divider"></div>
-            <button class="header-btn sound-btn" title="Sound Mixer" aria-label="Sound Mixer">
+            <button class="icon-btn" id="sound-btn" title="Sound Mixer">
               <ha-icon icon="mdi:volume-high"></ha-icon>
             </button>
-            <button class="header-btn keyboard-btn" title="Keyboard" aria-label="Keyboard">
+            <button class="icon-btn" id="keyboard-btn" title="Keyboard">
               <ha-icon icon="mdi:keyboard"></ha-icon>
+            </button>
+            <button class="icon-btn" id="lock-btn" title="Lock Workstation">
+              <ha-icon icon="mdi:lock"></ha-icon>
             </button>
           </div>
         </div>
+        
         <div class="card-content">
-          <div class="screen-container ${!isOnline ? 'offline' : ''}" id="screen-container">
+          <!-- Big Touchpad Area -->
+          <div class="touchpad-container ${!isOnline ? 'offline' : ''}" id="touchpad-container">
             ${shouldShowStream ? `
               <div class="screen-wrapper">
                 <img id="screen-stream" 
@@ -157,111 +171,199 @@ class OpenCtrolRemoteCard extends HTMLElement {
                 </button>
               </div>
             ` : ''}
-            <div class="touchpad-placeholder ${isOnline ? '' : 'offline'}" id="touchpad-placeholder" style="display: ${shouldShowStream && isScreenCaptureActive ? 'none' : 'flex'};">
-              <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
-              <div class="touchpad-text">${isOnline ? 'Touchpad Mode' : 'Device Offline'}</div>
-              <div class="touchpad-hint">${isOnline ? 'Move your finger to control the mouse' : 'Waiting for connection...'}</div>
+            <div class="touchpad-area ${shouldShowStream && isScreenCaptureActive ? 'hidden' : ''}" id="touchpad-area">
+              <div class="touchpad-visual">
+                <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
+                <div class="touchpad-text">${isOnline ? 'Touchpad' : 'Device Offline'}</div>
+                <div class="touchpad-hint">${isOnline ? 'Drag to move mouse • Tap to click • Scroll with two fingers' : 'Waiting for connection...'}</div>
+              </div>
             </div>
           </div>
 
-          <div class="controls-panel popups">
-            <div class="control-section keyboard-section">
-              <div class="section-header">
-                <div class="section-title">Keyboard</div>
-                <button class="close-popup" aria-label="Close Keyboard">
-                  <ha-icon icon="mdi:close"></ha-icon>
-                </button>
-              </div>
+          <!-- Keyboard Popup Menu -->
+          <div class="popup-menu keyboard-menu" id="keyboard-menu">
+            <div class="popup-header">
+              <div class="popup-title">Keyboard</div>
+              <button class="popup-close" aria-label="Close">
+                <ha-icon icon="mdi:close"></ha-icon>
+              </button>
+            </div>
+            <div class="popup-content">
               <div class="input-group">
                 <input type="text" id="text-input" placeholder="Type text here..." class="text-input" aria-label="Text Input">
                 <button class="control-btn" id="type-btn" aria-label="Send Text">
-                  <ha-icon icon="mdi:send"></ha-icon> Type
+                  <ha-icon icon="mdi:send"></ha-icon> Send
                 </button>
               </div>
-              <div class="keyboard-grid">
-                <div class="keyboard-row">
-                  <button class="keyboard-key" data-key="ESC" aria-label="Escape">Esc</button>
-                  <button class="keyboard-key" data-key="F1" aria-label="F1">F1</button>
-                  <button class="keyboard-key" data-key="F2" aria-label="F2">F2</button>
-                  <button class="keyboard-key" data-key="F3" aria-label="F3">F3</button>
-                  <button class="keyboard-key" data-key="F4" aria-label="F4">F4</button>
-                  <button class="keyboard-key" data-key="F5" aria-label="F5">F5</button>
-                  <button class="keyboard-key" data-key="F6" aria-label="F6">F6</button>
-                  <button class="keyboard-key" data-key="F7" aria-label="F7">F7</button>
-                  <button class="keyboard-key" data-key="F8" aria-label="F8">F8</button>
-                  <button class="keyboard-key" data-key="F9" aria-label="F9">F9</button>
-                  <button class="keyboard-key" data-key="F10" aria-label="F10">F10</button>
-                  <button class="keyboard-key" data-key="F11" aria-label="F11">F11</button>
-                  <button class="keyboard-key" data-key="F12" aria-label="F12">F12</button>
-                </div>
-                <div class="keyboard-row">
-                  <button class="keyboard-key toggle" data-key="CTRL" aria-label="Control">Ctrl</button>
-                  <button class="keyboard-key toggle" data-key="ALT" aria-label="Alt">Alt</button>
-                  <button class="keyboard-key toggle" data-key="SHIFT" aria-label="Shift">Shift</button>
-                  <button class="keyboard-key toggle" data-key="WIN" aria-label="Windows">Win</button>
-                  <button class="keyboard-key" data-key="TAB" aria-label="Tab">Tab</button>
-                  <button class="keyboard-key" data-key="CAPS_LOCK" aria-label="Caps Lock">Caps</button>
-                  <button class="keyboard-key" data-key="SPACE" aria-label="Space">Space</button>
-                  <button class="keyboard-key" data-key="ENTER" aria-label="Enter">Enter</button>
-                </div>
-                <div class="keyboard-row">
-                  <button class="keyboard-key" data-key="INSERT" aria-label="Insert">Ins</button>
-                  <button class="keyboard-key" data-key="DELETE" aria-label="Delete">Del</button>
-                  <button class="keyboard-key" data-key="HOME" aria-label="Home">Home</button>
-                  <button class="keyboard-key" data-key="END" aria-label="End">End</button>
-                  <button class="keyboard-key" data-key="PAGEUP" aria-label="Page Up">PgUp</button>
-                  <button class="keyboard-key" data-key="PAGEDOWN" aria-label="Page Down">PgDn</button>
-                  <button class="keyboard-key" data-key="UP" aria-label="Arrow Up">↑</button>
-                  <button class="keyboard-key" data-key="LEFT" aria-label="Arrow Left">←</button>
-                  <button class="keyboard-key" data-key="DOWN" aria-label="Arrow Down">↓</button>
-                  <button class="keyboard-key" data-key="RIGHT" aria-label="Arrow Right">→</button>
-                </div>
-                <div class="keyboard-row">
-                  <button class="keyboard-key" data-keys="CTRL+ALT+DEL" aria-label="Ctrl Alt Del">Ctrl+Alt+Del</button>
-                  <button class="keyboard-key" data-keys="ALT+TAB" aria-label="Alt Tab">Alt+Tab</button>
-                  <button class="keyboard-key" data-keys="CTRL+C" aria-label="Copy">Ctrl+C</button>
-                  <button class="keyboard-key" data-keys="CTRL+V" aria-label="Paste">Ctrl+V</button>
-                  <button class="keyboard-key" data-keys="CTRL+SHIFT+ESC" aria-label="Task Manager">TaskMgr</button>
-                </div>
+              
+              <!-- Function Keys Row -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="ESC">Esc</button>
+                <button class="keyboard-key" data-key="F1">F1</button>
+                <button class="keyboard-key" data-key="F2">F2</button>
+                <button class="keyboard-key" data-key="F3">F3</button>
+                <button class="keyboard-key" data-key="F4">F4</button>
+                <button class="keyboard-key" data-key="F5">F5</button>
+                <button class="keyboard-key" data-key="F6">F6</button>
+                <button class="keyboard-key" data-key="F7">F7</button>
+                <button class="keyboard-key" data-key="F8">F8</button>
+                <button class="keyboard-key" data-key="F9">F9</button>
+                <button class="keyboard-key" data-key="F10">F10</button>
+                <button class="keyboard-key" data-key="F11">F11</button>
+                <button class="keyboard-key" data-key="F12">F12</button>
+              </div>
+
+              <!-- Modifier Keys Row -->
+              <div class="keyboard-row">
+                <button class="keyboard-key toggle" data-key="CTRL">Ctrl</button>
+                <button class="keyboard-key toggle" data-key="ALT">Alt</button>
+                <button class="keyboard-key toggle" data-key="SHIFT">Shift</button>
+                <button class="keyboard-key toggle" data-key="WIN">Win</button>
+                <div class="keyboard-spacer"></div>
+                <button class="keyboard-key" data-key="TAB">Tab</button>
+                <button class="keyboard-key" data-key="ENTER">Enter</button>
+                <button class="keyboard-key" data-key="BACKSPACE">⌫</button>
+                <button class="keyboard-key" data-key="DELETE">Del</button>
+              </div>
+
+              <!-- Main Keys Row -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="1">1</button>
+                <button class="keyboard-key" data-key="2">2</button>
+                <button class="keyboard-key" data-key="3">3</button>
+                <button class="keyboard-key" data-key="4">4</button>
+                <button class="keyboard-key" data-key="5">5</button>
+                <button class="keyboard-key" data-key="6">6</button>
+                <button class="keyboard-key" data-key="7">7</button>
+                <button class="keyboard-key" data-key="8">8</button>
+                <button class="keyboard-key" data-key="9">9</button>
+                <button class="keyboard-key" data-key="0">0</button>
+              </div>
+
+              <!-- Letter Keys Row 1 -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="Q">Q</button>
+                <button class="keyboard-key" data-key="W">W</button>
+                <button class="keyboard-key" data-key="E">E</button>
+                <button class="keyboard-key" data-key="R">R</button>
+                <button class="keyboard-key" data-key="T">T</button>
+                <button class="keyboard-key" data-key="Y">Y</button>
+                <button class="keyboard-key" data-key="U">U</button>
+                <button class="keyboard-key" data-key="I">I</button>
+                <button class="keyboard-key" data-key="O">O</button>
+                <button class="keyboard-key" data-key="P">P</button>
+              </div>
+
+              <!-- Letter Keys Row 2 -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="A">A</button>
+                <button class="keyboard-key" data-key="S">S</button>
+                <button class="keyboard-key" data-key="D">D</button>
+                <button class="keyboard-key" data-key="F">F</button>
+                <button class="keyboard-key" data-key="G">G</button>
+                <button class="keyboard-key" data-key="H">H</button>
+                <button class="keyboard-key" data-key="J">J</button>
+                <button class="keyboard-key" data-key="K">K</button>
+                <button class="keyboard-key" data-key="L">L</button>
+              </div>
+
+              <!-- Letter Keys Row 3 -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="Z">Z</button>
+                <button class="keyboard-key" data-key="X">X</button>
+                <button class="keyboard-key" data-key="C">C</button>
+                <button class="keyboard-key" data-key="V">V</button>
+                <button class="keyboard-key" data-key="B">B</button>
+                <button class="keyboard-key" data-key="N">N</button>
+                <button class="keyboard-key" data-key="M">M</button>
+              </div>
+
+              <!-- Arrow Keys Row -->
+              <div class="keyboard-row">
+                <button class="keyboard-key" data-key="UP">↑</button>
+                <button class="keyboard-key" data-key="LEFT">←</button>
+                <button class="keyboard-key" data-key="DOWN">↓</button>
+                <button class="keyboard-key" data-key="RIGHT">→</button>
+                <div class="keyboard-spacer"></div>
+                <button class="keyboard-key" data-key="HOME">Home</button>
+                <button class="keyboard-key" data-key="END">End</button>
+                <button class="keyboard-key" data-key="PAGEUP">PgUp</button>
+                <button class="keyboard-key" data-key="PAGEDOWN">PgDn</button>
+              </div>
+
+              <!-- Shortcuts Row -->
+              <div class="keyboard-row shortcuts-row">
+                <button class="keyboard-key shortcut" data-keys="CTRL+C">Ctrl+C</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+V">Ctrl+V</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+X">Ctrl+X</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+Z">Ctrl+Z</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+A">Ctrl+A</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+S">Ctrl+S</button>
+                <button class="keyboard-key shortcut" data-keys="ALT+TAB">Alt+Tab</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+SHIFT+ESC">TaskMgr</button>
+                <button class="keyboard-key shortcut" data-keys="CTRL+ALT+DEL">Ctrl+Alt+Del</button>
+                <button class="keyboard-key shortcut" data-keys="WIN+L">Win+L</button>
+                <button class="keyboard-key shortcut" data-keys="WIN+R">Win+R</button>
               </div>
             </div>
+          </div>
 
-            <div class="control-section sound-section">
-              <div class="section-header">
-                <div class="section-title">Volume Control</div>
-                <button class="close-popup" aria-label="Close Volume">
-                  <ha-icon icon="mdi:close"></ha-icon>
-                </button>
+          <!-- Sound Popup Menu -->
+          <div class="popup-menu sound-menu" id="sound-menu">
+            <div class="popup-header">
+              <div class="popup-title">Sound Mixer</div>
+              <button class="popup-close" aria-label="Close">
+                <ha-icon icon="mdi:close"></ha-icon>
+              </button>
+            </div>
+            <div class="popup-content">
+              <div class="sound-section">
+                <div class="sound-label">Master Volume</div>
+                <div class="volume-control">
+                  <input type="range" id="master-volume-slider" min="0" max="100" value="${masterVolume}" 
+                         class="volume-slider" aria-label="Master Volume">
+                  <span class="volume-value">${masterVolume}%</span>
+                </div>
               </div>
-              <div class="volume-control">
-                <ha-icon icon="mdi:volume-low" class="volume-icon"></ha-icon>
-                <input type="range" id="volume-slider" min="0" max="100" 
-                       value="${masterVolume}" 
-                       class="volume-slider" 
-                       aria-label="Master Volume">
-                <ha-icon icon="mdi:volume-high" class="volume-icon"></ha-icon>
-                <span id="volume-value" class="volume-value">${masterVolume}%</span>
+
+              <div class="sound-section">
+                <div class="sound-label">Output Device</div>
+                <select id="output-device-select" class="device-select" aria-label="Output Device">
+                  ${audioDevices.map(device => `
+                    <option value="${this._escapeHtml(device.id)}" ${device.id === defaultDeviceId ? 'selected' : ''}>
+                      ${this._escapeHtml(device.name || device.id)}
+                    </option>
+                  `).join('')}
+                </select>
               </div>
-              <div class="section-title app-volume-title">App Volumes</div>
-              <div class="app-volume-list">
-                ${audioApps.length > 0 ? audioApps.map(app => `
-                  <div class="app-volume-item">
-                    <span class="app-name" title="${this._escapeHtml(app.name || 'Unknown')}">${this._escapeHtml(app.name || 'Unknown')}</span>
-                    <input type="range" class="app-volume-slider" min="0" max="100" 
-                           value="${Math.round((app.volume || 0) * 100)}" 
-                           data-process-id="${app.process_id || 0}" aria-label="${this._escapeHtml(app.name || 'Unknown')} Volume">
-                    <span class="app-volume-value">${Math.round((app.volume || 0) * 100)}%</span>
-                  </div>
-                `).join('') : '<div class="no-apps">No audio apps detected</div>'}
+
+              <div class="sound-section">
+                <div class="sound-label">Application Volumes</div>
+                <div class="app-volumes">
+                  ${audioApps.length > 0 ? audioApps.map(app => `
+                    <div class="app-volume-item">
+                      <div class="app-name">${this._escapeHtml(app.name || `Process ${app.process_id}`)}</div>
+                      <div class="volume-control">
+                        <input type="range" class="app-volume-slider" 
+                               data-process-id="${app.process_id}"
+                               min="0" max="100" 
+                               value="${Math.round((app.volume || 0) * 100)}" 
+                               aria-label="Volume for ${this._escapeHtml(app.name || 'app')}">
+                        <span class="volume-value">${Math.round((app.volume || 0) * 100)}%</span>
+                      </div>
+                      ${audioDevices && audioDevices.length > 0 ? `
+                        <select class="app-device-select" data-process-id="${app.process_id}" aria-label="Device for ${this._escapeHtml(app.name || 'app')}">
+                          ${audioDevices.map(device => `
+                            <option value="${this._escapeHtml(device.id)}" ${device.id === app.device_id ? 'selected' : ''}>
+                              ${this._escapeHtml(device.name || device.id)}
+                            </option>
+                          `).join('')}
+                        </select>
+                      ` : ''}
+                    </div>
+                  `).join('') : '<div class="no-apps">No audio applications running</div>'}
+                </div>
               </div>
-              <div class="section-title device-selection-title">Output Devices</div>
-              <select id="output-device-select" class="monitor-select" aria-label="Select Output Device">
-                ${audioDevices.map(device => `
-                  <option value="${device.id}" ${device.id === defaultDeviceId ? 'selected' : ''}>
-                    ${this._escapeHtml(device.name || device.id)}
-                  </option>
-                `).join('')}
-              </select>
             </div>
           </div>
         </div>
@@ -270,20 +372,15 @@ class OpenCtrolRemoteCard extends HTMLElement {
 
     this.attachEventHandlers();
     this.setupScreenInteraction();
-  }
-
-  _escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (isOnline) {
+      this.setupTouchpadMode();
+    }
   }
 
   getBaseUrlFromEntity(entity) {
-    // Try to extract base URL from entity attributes
     const attrs = entity.attributes || {};
     if (attrs.base_url) return attrs.base_url;
     
-    // Try to get from config entry
     if (this._hass.config_entries && this._hass.config_entries.entries) {
       const configEntry = this._hass.config_entries.entries.find(
         e => e.domain === 'opencrol' && (e.title?.includes(attrs.client_id || '') || e.title?.includes(entity.entity_id))
@@ -298,93 +395,72 @@ class OpenCtrolRemoteCard extends HTMLElement {
     return null;
   }
 
-  setupScreenInteraction() {
-    const screenOverlay = this.querySelector('#screen-overlay');
-    const screenImg = this.querySelector('#screen-stream');
-    const touchpadPlaceholder = this.querySelector('#touchpad-placeholder');
-    const screenContainer = this.querySelector('.screen-container');
+  setupTouchpadMode() {
+    const touchpadArea = this.querySelector('#touchpad-area');
+    // Only setup if touchpad exists and is visible (not hidden)
+    if (!touchpadArea || touchpadArea.classList.contains('hidden')) return;
     
-    if (!screenImg || !screenOverlay) {
-      // Touchpad mode
-      if (touchpadPlaceholder) {
-        this.setupTouchpadMode(touchpadPlaceholder);
-      }
-      return;
-    }
+    // Prevent duplicate event listeners by checking if already set up
+    if (touchpadArea.dataset.touchpadSetup === 'true') return;
+    touchpadArea.dataset.touchpadSetup = 'true';
 
-    this._imgElement = screenImg;
+    let isDown = false;
+    let lastX = null;
+    let lastY = null;
+    let startX = null;
+    let startY = null;
 
-    // Handle clicks on screen
-    screenOverlay.addEventListener('click', (e) => {
-      if (e.target === screenOverlay || e.target.classList.contains('screen-overlay')) {
-        const rect = screenImg.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-        
-        this.sendCommand('click', { 
-          button: 'left', 
-          x: x, 
-          y: y 
-        });
-      }
-    });
-
-    // Handle right-click
-    screenOverlay.addEventListener('contextmenu', (e) => {
+    // Mouse events
+    touchpadArea.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      const rect = screenImg.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-      const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-      
-      this.sendCommand('click', { 
-        button: 'right', 
-        x: x, 
-        y: y 
-      });
+      isDown = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      startX = e.clientX;
+      startY = e.clientY;
+      touchpadArea.classList.add('active');
     });
 
-    // Handle double-click
-    let lastClickTime = 0;
-    screenOverlay.addEventListener('click', (e) => {
-      const now = Date.now();
-      if (now - lastClickTime < 300) {
-        // Double click
-        const rect = screenImg.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-        this.sendCommand('click', { button: 'left', x: x, y: y });
-        setTimeout(() => {
-          this.sendCommand('click', { button: 'left', x: x, y: y });
-        }, 50);
-      }
-      lastClickTime = now;
-    });
-
-    // Handle mouse movement for drag
-    let isDragging = false;
-    let lastMoveTime = 0;
-    screenOverlay.addEventListener('mousedown', () => { 
-      isDragging = true; 
-    });
-    screenOverlay.addEventListener('mouseup', () => { 
-      isDragging = false; 
-    });
-    screenOverlay.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        const now = Date.now();
-        if (now - lastMoveTime > 50) { // Throttle to ~20fps
-          const rect = screenImg.getBoundingClientRect();
-          const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-          const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-          
-          this.sendCommand('move_mouse', { x: x, y: y });
-          lastMoveTime = now;
+    touchpadArea.addEventListener('mousemove', (e) => {
+      e.preventDefault();
+      if (isDown && lastX !== null && lastY !== null) {
+        const deltaX = e.clientX - lastX;
+        const deltaY = e.clientY - lastY;
+        
+        if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+          this.sendCommand('move_mouse', { 
+            x: Math.round(deltaX * 1.5),
+            y: Math.round(deltaY * 1.5),
+            relative: true
+          });
+          lastX = e.clientX;
+          lastY = e.clientY;
         }
       }
     });
 
-    // Handle scroll
-    screenOverlay.addEventListener('wheel', (e) => {
+    touchpadArea.addEventListener('mouseup', (e) => {
+      e.preventDefault();
+      touchpadArea.classList.remove('active');
+      if (isDown && startX !== null && startY !== null) {
+        const delta = Math.abs(e.clientX - startX) + Math.abs(e.clientY - startY);
+        if (delta < 5) {
+          this.sendCommand('click', { button: 'left' });
+        }
+      }
+      isDown = false;
+      lastX = null;
+      lastY = null;
+      startX = null;
+      startY = null;
+    });
+
+    touchpadArea.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.sendCommand('click', { button: 'right' });
+    });
+
+    touchpadArea.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = Math.round(e.deltaY);
       if (delta !== 0) {
@@ -392,51 +468,190 @@ class OpenCtrolRemoteCard extends HTMLElement {
       }
     });
 
-    // Always setup touchpad mode first (always available when online)
-    if (touchpadPlaceholder && isOnline) {
-      this.setupTouchpadMode(touchpadPlaceholder);
+    // Touch events
+    let touchStartX = null;
+    let touchStartY = null;
+    let touchStartTime = null;
+
+    touchpadArea.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touchStartTime = Date.now();
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+      isDown = true;
+      touchpadArea.classList.add('active');
+    });
+
+    touchpadArea.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && isDown && lastX !== null && lastY !== null) {
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - lastX;
+        const deltaY = touch.clientY - lastY;
+        
+        if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+          this.sendCommand('move_mouse', { 
+            x: Math.round(deltaX * 1.5),
+            y: Math.round(deltaY * 1.5),
+            relative: true
+          });
+          lastX = touch.clientX;
+          lastY = touch.clientY;
+        }
+      } else if (e.touches.length === 2) {
+        // Two-finger scroll
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const deltaY = (touch1.clientY + touch2.clientY) / 2 - (lastY || touch1.clientY);
+        if (Math.abs(deltaY) > 5) {
+          this.sendCommand('scroll', { delta: Math.round(deltaY) });
+          lastY = (touch1.clientY + touch2.clientY) / 2;
+        }
+      }
+    });
+
+    touchpadArea.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      touchpadArea.classList.remove('active');
+      if (touchStartX !== null && touchStartY !== null) {
+        const touch = e.changedTouches[0];
+        const delta = Math.abs(touch.clientX - touchStartX) + Math.abs(touch.clientY - touchStartY);
+        const duration = Date.now() - touchStartTime;
+        
+        if (delta < 10 && duration < 300) {
+          this.sendCommand('click', { button: 'left' });
+        }
+      }
+      isDown = false;
+      lastX = null;
+      lastY = null;
+      touchStartX = null;
+      touchStartY = null;
+    });
+  }
+
+  setupScreenInteraction() {
+    const screenOverlay = this.querySelector('#screen-overlay');
+    const screenImg = this.querySelector('#screen-stream');
+    const touchpadArea = this.querySelector('#touchpad-area');
+    const screenContainer = this.querySelector('#touchpad-container');
+    
+    if (!screenImg || !screenOverlay) {
+      if (touchpadArea) {
+        touchpadArea.classList.remove('hidden');
+      }
+      return;
     }
 
-    // Handle screen stream load/error
+    this._imgElement = screenImg;
+
+    // Click handling
+    screenOverlay.addEventListener('click', (e) => {
+      if (e.target === screenOverlay || e.target.classList.contains('screen-overlay')) {
+        const rect = screenImg.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
+        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
+        this.sendCommand('click', { button: 'left', x: x, y: y });
+      }
+    });
+
+    screenOverlay.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const rect = screenImg.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
+      this.sendCommand('click', { button: 'right', x: x, y: y });
+    });
+
+    // Mouse movement
+    let isDragging = false;
+    screenOverlay.addEventListener('mousedown', () => { isDragging = true; });
+    screenOverlay.addEventListener('mouseup', () => { isDragging = false; });
+    screenOverlay.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const rect = screenImg.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
+        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
+        this.sendCommand('move_mouse', { x: x, y: y });
+      }
+    });
+
+    screenOverlay.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.sendCommand('scroll', { delta: Math.round(e.deltaY) });
+    });
+
+    // Always setup touchpad first
+    if (touchpadArea) {
+      this.setupTouchpadMode();
+    }
+
+    // Stream load handlers
     screenImg.addEventListener('load', () => {
-      // Stream loaded successfully - show it, hide touchpad
       if (screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
         screenImg.style.display = 'block';
-        if (screenOverlay) screenOverlay.style.display = 'block';
+        screenOverlay.style.display = 'block';
         const fullscreenBtn = this.querySelector('.fullscreen-btn');
         if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
-        if (touchpadPlaceholder) {
-          touchpadPlaceholder.style.display = 'none';
-        }
+        if (touchpadArea) touchpadArea.classList.add('hidden');
       }
     });
     
     screenImg.addEventListener('error', () => {
-      // Stream failed - show touchpad
       screenImg.style.display = 'none';
-      if (screenOverlay) screenOverlay.style.display = 'none';
+      screenOverlay.style.display = 'none';
       const fullscreenBtn = this.querySelector('.fullscreen-btn');
       if (fullscreenBtn) fullscreenBtn.style.display = 'none';
-      if (touchpadPlaceholder) {
-        touchpadPlaceholder.style.display = 'flex';
-      }
+      if (touchpadArea) touchpadArea.classList.remove('hidden');
     });
     
-    // Try to start screen capture if online
-    if (isOnline && this.config.entity) {
-      const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
-      if (baseUrl) {
-        // Start screen capture explicitly
+    // Try to start screen capture if online (stream endpoint auto-starts capture)
+    const entityForCapture = this._hass.states[this.config.entity];
+    const attrsForCapture = entityForCapture?.attributes || {};
+    const statusForCapture = attrsForCapture.status || 'offline';
+    const isOnlineForCapture = statusForCapture === 'online';
+    const isCaptureActiveForCapture = attrsForCapture.screen_capture_active || false;
+    const currentMonitorForCapture = attrsForCapture.current_monitor !== undefined ? attrsForCapture.current_monitor : 0;
+    
+    if (isOnlineForCapture && this.config.entity && screenImg) {
+      // The stream endpoint auto-starts capture when accessed, but we call start_screen_capture
+      // to ensure status is updated correctly
+      if (!isCaptureActiveForCapture) {
         setTimeout(() => {
           this._hass.callService('opencrol', 'start_screen_capture', {
             entity_id: this.config.entity,
-          }).catch(() => {});
-        }, 500);
+          }).then(() => {
+            // Refresh stream after starting capture
+            setTimeout(() => {
+              if (screenImg && this._screenStreamUrl) {
+                const baseUrl = this._screenStreamUrl.split('?')[0];
+                const monitorPart = this._screenStreamUrl.includes('monitor=') 
+                  ? this._screenStreamUrl.split('monitor=')[1].split('&')[0]
+                  : currentMonitorForCapture;
+                screenImg.src = `${baseUrl}?monitor=${monitorPart}&_t=${Date.now()}`;
+              }
+            }, 800);
+          }).catch(err => {
+            console.error('Failed to start screen capture:', err);
+          });
+        }, 300);
+      } else {
+        // Already active, refresh stream URL to get latest frames
+        if (screenImg && this._screenStreamUrl) {
+          const baseUrl = this._screenStreamUrl.split('?')[0];
+          const monitorPart = this._screenStreamUrl.includes('monitor=') 
+            ? this._screenStreamUrl.split('monitor=')[1].split('&')[0]
+            : currentMonitorForCapture;
+          screenImg.src = `${baseUrl}?monitor=${monitorPart}&_t=${Date.now()}`;
+        }
       }
     }
     
     // Check if image already loaded
-    if (screenImg.complete && screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
+    if (screenImg && screenImg.complete && screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
       screenImg.dispatchEvent(new Event('load'));
     }
 
@@ -445,126 +660,23 @@ class OpenCtrolRemoteCard extends HTMLElement {
     if (fullscreenBtn) {
       fullscreenBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
-        if (baseUrl) {
-          const entity = this._hass.states[this.config.entity];
-          const attributes = entity?.attributes || {};
-          const currentMonitor = attributes.current_monitor !== undefined ? attributes.current_monitor : 0;
-          this.openFullscreenRemote(baseUrl, currentMonitor);
-        }
+        const entityForFullscreen = this._hass.states[this.config.entity];
+        const attrsForFullscreen = entityForFullscreen?.attributes || {};
+        const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entityForFullscreen);
+        const currentMonitor = attrsForFullscreen.current_monitor !== undefined ? attrsForFullscreen.current_monitor : 0;
+        this.openFullscreenRemote(baseUrl, currentMonitor);
       });
     }
   }
 
-  setupTouchpadMode(container) {
-    if (!container) return;
-
-    let lastX = null;
-    let lastY = null;
-    let isDown = false;
-    let touchStartTime = 0;
-
-    // Touchpad-style relative movement
-    container.addEventListener('mousedown', (e) => {
-      isDown = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      touchStartTime = Date.now();
-    });
-
-    container.addEventListener('mouseup', () => {
-      const now = Date.now();
-      if (isDown && (now - touchStartTime < 200) && lastX === null && lastY === null) {
-        // Quick tap - left click
-        this.sendCommand('click', { button: 'left' });
-      }
-      isDown = false;
-      lastX = null;
-      lastY = null;
-    });
-
-    container.addEventListener('mousemove', (e) => {
-      if (isDown && lastX !== null && lastY !== null) {
-        const deltaX = e.clientX - lastX;
-        const deltaY = e.clientY - lastY;
-        
-        if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
-          this.sendCommand('move_mouse', { 
-            x: Math.round(deltaX * 2), 
-            y: Math.round(deltaY * 2),
-            relative: true
-          });
-          
-          lastX = e.clientX;
-          lastY = e.clientY;
-        }
-      } else if (isDown) {
-        lastX = e.clientX;
-        lastY = e.clientY;
-      }
-    });
-
-    // Right-click (long press or context menu)
-    container.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      this.sendCommand('click', { button: 'right' });
-    });
-
-    // Touch support for mobile
-    container.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      lastX = touch.clientX;
-      lastY = touch.clientY;
-      isDown = true;
-      touchStartTime = Date.now();
-    });
-
-    container.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      const now = Date.now();
-      if (isDown && (now - touchStartTime < 300)) {
-        // Quick tap
-        this.sendCommand('click', { button: 'left' });
-      }
-      isDown = false;
-      lastX = null;
-      lastY = null;
-    });
-
-    container.addEventListener('touchmove', (e) => {
-      e.preventDefault();
-      if (isDown && lastX !== null && lastY !== null) {
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - lastX;
-        const deltaY = touch.clientY - lastY;
-        
-        if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
-          this.sendCommand('move_mouse', { 
-            x: Math.round(deltaX * 2),
-            y: Math.round(deltaY * 2),
-            relative: true
-          });
-          
-          lastX = touch.clientX;
-          lastY = touch.clientY;
-        }
-      }
-    });
-  }
-
   attachEventHandlers() {
-    // Power on/off buttons
-    const powerOnBtn = this.querySelector('.power-on-btn');
-    if (powerOnBtn && this._hass && this.config?.entity) {
+    // Power buttons
+    const powerOnBtn = this.querySelector('#power-on-btn');
+    if (powerOnBtn) {
       powerOnBtn.addEventListener('click', () => {
-        // Turn on screen capture using media_player entity
         const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
         if (this._hass.states[mediaEntityId]) {
-          this._hass.callService('media_player', 'turn_on', {
-            entity_id: mediaEntityId,
-          }).catch(() => {
-            // Fallback to service call
+          this._hass.callService('media_player', 'turn_on', { entity_id: mediaEntityId }).catch(() => {
             this.sendCommand('start_screen_capture');
           });
         } else {
@@ -573,16 +685,12 @@ class OpenCtrolRemoteCard extends HTMLElement {
       });
     }
 
-    const powerOffBtn = this.querySelector('.power-off-btn');
-    if (powerOffBtn && this._hass && this.config?.entity) {
+    const powerOffBtn = this.querySelector('#power-off-btn');
+    if (powerOffBtn) {
       powerOffBtn.addEventListener('click', () => {
-        // Turn off screen capture using media_player entity
         const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
         if (this._hass.states[mediaEntityId]) {
-          this._hass.callService('media_player', 'turn_off', {
-            entity_id: mediaEntityId,
-          }).catch(() => {
-            // Fallback to service call
+          this._hass.callService('media_player', 'turn_off', { entity_id: mediaEntityId }).catch(() => {
             this.sendCommand('stop_screen_capture');
           });
         } else {
@@ -592,146 +700,99 @@ class OpenCtrolRemoteCard extends HTMLElement {
     }
 
     // Lock button
-    const powerBtn = this.querySelector('.power-btn');
-    if (powerBtn && this._hass && this.config?.entity) {
-      powerBtn.addEventListener('click', () => {
+    const lockBtn = this.querySelector('#lock-btn');
+    if (lockBtn) {
+      lockBtn.addEventListener('click', () => {
         this.sendCommand('lock');
       });
     }
 
-    // Screen buttons - select monitor and start screen capture
-    const screenButtons = this.querySelectorAll('.screen-btn');
-    screenButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
+    // Monitor buttons
+    this.querySelectorAll('.monitor-icon').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
         const index = parseInt(btn.dataset.monitorIndex);
-        const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(this._hass.states[this.config.entity]);
-        if (!baseUrl || Number.isNaN(index) || !this.config.entity) return;
+        if (!isNaN(index) && this.config.entity) {
+          this._hass.callService('opencrol', 'select_monitor', {
+            entity_id: this.config.entity,
+            monitor_index: index,
+          }).catch(() => {});
+          
+          this._hass.callService('opencrol', 'start_screen_capture', {
+            entity_id: this.config.entity,
+          }).catch(() => {});
 
-        // Mark active button
-        screenButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        // Switch monitor and start screen capture
-        this._hass.callService('opencrol', 'select_monitor', {
-          entity_id: this.config.entity,
-          monitor_index: index,
-        }).catch(() => {});
-        
-        // Start screen capture if not already active
-        this._hass.callService('opencrol', 'start_screen_capture', {
-          entity_id: this.config.entity,
-        }).catch(() => {});
-
-        // Refresh screen stream URL
-        const screenImg = this.querySelector('#screen-stream');
-        if (screenImg && this._screenStreamUrl) {
-          // Force reload by adding timestamp
-          screenImg.src = this._screenStreamUrl + (this._screenStreamUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
-        }
-      });
-    });
-
-    // Sound / keyboard popups with close buttons
-    const soundBtn = this.querySelector('.sound-btn');
-    if (soundBtn) {
-      soundBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const isShowing = this.classList.contains('show-sound');
-        // Close keyboard if open
-        if (this.classList.contains('show-keyboard')) {
-          this.classList.remove('show-keyboard');
-        }
-        // Toggle sound menu
-        if (isShowing) {
-          this.classList.remove('show-sound');
-        } else {
-          this.classList.add('show-sound');
-        }
-      });
-    }
-
-    const keyboardBtn = this.querySelector('.keyboard-btn');
-    if (keyboardBtn) {
-      keyboardBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const isShowing = this.classList.contains('show-keyboard');
-        // Close sound if open
-        if (this.classList.contains('show-sound')) {
-          this.classList.remove('show-sound');
-        }
-        // Toggle keyboard menu
-        if (isShowing) {
-          this.classList.remove('show-keyboard');
-        } else {
-          this.classList.add('show-keyboard');
-          const textInput = this.querySelector('#text-input');
-          if (textInput) {
-            setTimeout(() => textInput.focus(), 100);
+          // Update stream URL with new monitor
+          const entityForStream = this._hass.states[this.config.entity];
+          const attrsForStream = entityForStream?.attributes || {};
+          const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entityForStream);
+          if (baseUrl) {
+            const newStreamUrl = `${baseUrl}/api/v1/screenstream/stream?monitor=${index}`;
+            this._screenStreamUrl = newStreamUrl;
+            const screenImg = this.querySelector('#screen-stream');
+            if (screenImg) {
+              screenImg.src = `${newStreamUrl}&_t=${Date.now()}`;
+            }
           }
         }
       });
+    });
+
+    // Menu toggles
+    const soundBtn = this.querySelector('#sound-btn');
+    const keyboardBtn = this.querySelector('#keyboard-btn');
+    const soundMenu = this.querySelector('#sound-menu');
+    const keyboardMenu = this.querySelector('#keyboard-menu');
+
+    if (soundBtn && soundMenu) {
+      soundBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isOpen = soundMenu.classList.contains('open');
+        if (isOpen) {
+          soundMenu.classList.remove('open');
+        } else {
+          soundMenu.classList.add('open');
+          if (keyboardMenu) keyboardMenu.classList.remove('open');
+        }
+      });
     }
 
-    // Close popup buttons
-    this.querySelectorAll('.close-popup').forEach(btn => {
+    if (keyboardBtn && keyboardMenu) {
+      keyboardBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isOpen = keyboardMenu.classList.contains('open');
+        if (isOpen) {
+          keyboardMenu.classList.remove('open');
+        } else {
+          keyboardMenu.classList.add('open');
+          if (soundMenu) soundMenu.classList.remove('open');
+          const textInput = this.querySelector('#text-input');
+          if (textInput) setTimeout(() => textInput.focus(), 100);
+        }
+      });
+    }
+
+    // Close buttons
+    this.querySelectorAll('.popup-close').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.classList.remove('show-keyboard', 'show-sound');
+        this.querySelectorAll('.popup-menu').forEach(menu => menu.classList.remove('open'));
       });
     });
 
-    // Volume slider (master volume)
-    const volumeSlider = this.querySelector('#volume-slider');
-    if (volumeSlider) {
-      let volumeTimeout = null;
-      volumeSlider.addEventListener('input', (e) => {
-        const value = e.target.value;
-        const volumeValue = this.querySelector('#volume-value');
-        if (volumeValue) {
-          volumeValue.textContent = value + '%';
+    // Close on outside click (only add once)
+    if (!this._outsideClickHandler) {
+      this._outsideClickHandler = (e) => {
+        if (!this.contains(e.target)) {
+          this.querySelectorAll('.popup-menu').forEach(menu => menu.classList.remove('open'));
         }
-        
-        // Debounce volume changes
-        clearTimeout(volumeTimeout);
-        volumeTimeout = setTimeout(() => {
-          this.sendCommand('set_volume', { volume: value / 100 });
-        }, 100);
-      });
+      };
+      document.addEventListener('click', this._outsideClickHandler);
     }
 
-    // App volume sliders
-    this.querySelectorAll('.app-volume-slider').forEach(slider => {
-      let appVolumeTimeout = null;
-      slider.addEventListener('input', (e) => {
-        const value = e.target.value;
-        const processId = parseInt(e.target.dataset.processId);
-        const appVolumeValue = e.target.parentElement.querySelector('.app-volume-value');
-        if (appVolumeValue) {
-          appVolumeValue.textContent = value + '%';
-        }
-        
-        // Debounce app volume changes
-        clearTimeout(appVolumeTimeout);
-        appVolumeTimeout = setTimeout(() => {
-          this.sendCommand('set_app_volume', { 
-            process_id: processId, 
-            volume: value / 100 
-          });
-        }, 100);
-      });
-    });
-
-    // Output device selector
-    const outputDeviceSelect = this.querySelector('#output-device-select');
-    if (outputDeviceSelect) {
-      outputDeviceSelect.addEventListener('change', (e) => {
-        const deviceId = e.target.value;
-        this.sendCommand('set_system_default_device', { device_id: deviceId });
-      });
-    }
-
-    // Type text button
+    // Type text
     const typeBtn = this.querySelector('#type-btn');
     const textInput = this.querySelector('#text-input');
     if (typeBtn && textInput) {
@@ -749,7 +810,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
       });
     }
 
-    // Keyboard grid keys with toggle/combination support
+    // Keyboard keys
     this._activeModifiers = this._activeModifiers || new Set();
 
     const updateModifierStyles = () => {
@@ -770,23 +831,18 @@ class OpenCtrolRemoteCard extends HTMLElement {
         
         const key = (btn.dataset.key || '').toUpperCase();
         const combo = btn.dataset.keys;
-        const isToggle = btn.classList.contains('toggle');
 
         if (combo) {
-          // Explicit combination button (e.g., Ctrl+Alt+Del)
           this.sendCommand('send_key', { keys: combo });
-          // Clear any active modifiers after explicit combo
           this._activeModifiers.clear();
           updateModifierStyles();
           return;
         }
 
-        if (!key && !combo) {
-          return;
-        }
+        if (!key) return;
 
+        const isToggle = btn.classList.contains('toggle');
         if (isToggle && key) {
-          // Toggle modifier state
           if (this._activeModifiers.has(key)) {
             this._activeModifiers.delete(key);
           } else {
@@ -794,15 +850,86 @@ class OpenCtrolRemoteCard extends HTMLElement {
           }
           updateModifierStyles();
         } else if (key) {
-          // Non-modifier: combine with any active modifiers and send
           const mods = Array.from(this._activeModifiers);
           const parts = mods.length > 0 ? [...mods, key] : [key];
           const keysString = parts.join('+');
           this.sendCommand('send_key', { keys: keysString });
-          // Clear modifiers after use
           this._activeModifiers.clear();
           updateModifierStyles();
         }
+      });
+    });
+
+    // Volume controls
+    const masterVolumeSlider = this.querySelector('#master-volume-slider');
+    if (masterVolumeSlider) {
+      let volumeTimeout;
+      masterVolumeSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        const valueDisplay = masterVolumeSlider.nextElementSibling;
+        if (valueDisplay) valueDisplay.textContent = value + '%';
+        
+        clearTimeout(volumeTimeout);
+        volumeTimeout = setTimeout(() => {
+          this.sendCommand('set_volume', { volume: value / 100 });
+        }, 100);
+      });
+    }
+
+    // App volume sliders
+    this.querySelectorAll('.app-volume-slider').forEach(slider => {
+      let volumeTimeout;
+      slider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        const processId = parseInt(e.target.dataset.processId);
+        const valueDisplay = e.target.nextElementSibling;
+        if (valueDisplay) valueDisplay.textContent = value + '%';
+        
+        clearTimeout(volumeTimeout);
+        volumeTimeout = setTimeout(() => {
+          this.sendCommand('set_app_volume', { process_id: processId, volume: value / 100 });
+        }, 100);
+      });
+    });
+
+    // Device selectors
+    const outputDeviceSelect = this.querySelector('#output-device-select');
+    if (outputDeviceSelect) {
+      outputDeviceSelect.addEventListener('change', async (e) => {
+        const deviceId = e.target.value;
+        if (!deviceId) return;
+        
+        try {
+          // Call the service directly to get better error feedback
+          const result = await this._hass.callService('opencrol', 'set_default_device', {
+            entity_id: this.config.entity,
+            device_id: deviceId
+          });
+          
+          // Log result for debugging
+          if (result && typeof result === 'object') {
+            if (result.warning) {
+              console.warn('Device selection warning:', result.warning);
+              console.warn('Requested:', result.requested_device, 'Current:', result.current_default);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to set default audio device:', err);
+          // Revert selection on error
+          const entity = this._hass.states[this.config.entity];
+          const devices = entity?.attributes?.audio_devices || [];
+          const currentDefault = devices.find(d => d.is_default)?.id;
+          if (currentDefault && outputDeviceSelect) {
+            outputDeviceSelect.value = currentDefault;
+          }
+        }
+      });
+    }
+
+    this.querySelectorAll('.app-device-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const processId = parseInt(e.target.dataset.processId);
+        this.sendCommand('set_app_device', { process_id: processId, device_id: e.target.value });
       });
     });
   }
@@ -816,102 +943,77 @@ class OpenCtrolRemoteCard extends HTMLElement {
     const entity = this._hass.states[this.config.entity];
     const attributes = entity?.attributes || {};
     const clientId = attributes.client_id || entity?.attributes?.friendly_name || this.config.entity;
-    const streamUrl = `${baseUrl}/api/v1/screenstream/stream?monitor=${monitorIndex}`;
+    const monitorParam = monitorIndex >= 0 ? `?monitor=${monitorIndex}` : '';
+    const streamUrl = `${baseUrl}/api/v1/screenstream/stream${monitorParam}`;
 
-    // Create fullscreen overlay
+    this._isFullscreenOpen = true;
     this._fullscreenOverlay = document.createElement('div');
-    this._fullscreenOverlay.className = 'opencrol-fullscreen-overlay';
+    this._fullscreenOverlay.className = 'fullscreen-overlay';
     this._fullscreenOverlay.innerHTML = `
-      <div class="opencrol-fullscreen-header">
-        <div class="opencrol-fullscreen-title">
-          <ha-icon icon="mdi:monitor"></ha-icon>
-          ${this._escapeHtml(clientId)} - Monitor ${monitorIndex + 1}
-        </div>
-        <button class="opencrol-fullscreen-close" aria-label="Close Fullscreen">
+      <div class="fullscreen-header">
+        <div class="fullscreen-title">${this._escapeHtml(clientId)} - Fullscreen Remote</div>
+        <button class="fullscreen-close" aria-label="Close Fullscreen">
           <ha-icon icon="mdi:close"></ha-icon>
         </button>
       </div>
-      <div class="opencrol-fullscreen-body">
-        <div class="opencrol-fullscreen-screen-container">
-          <img src="${streamUrl}" 
-               alt="Fullscreen Screen Stream" 
-               class="opencrol-fullscreen-screen">
-          <div class="opencrol-fullscreen-overlay-layer"></div>
-        </div>
+      <div class="fullscreen-content">
+        <img src="${streamUrl}" alt="Screen Stream" class="fullscreen-stream">
       </div>
     `;
 
     document.body.appendChild(this._fullscreenOverlay);
-    this._isFullscreenOpen = true;
 
-    // Setup event handlers for fullscreen
-    const fullscreenImg = this._fullscreenOverlay.querySelector('.opencrol-fullscreen-screen');
-    const fullscreenOverlay = this._fullscreenOverlay.querySelector('.opencrol-fullscreen-overlay-layer');
-    const closeBtn = this._fullscreenOverlay.querySelector('.opencrol-fullscreen-close');
-
+    const closeBtn = this._fullscreenOverlay.querySelector('.fullscreen-close');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => this.closeFullscreenRemote());
     }
 
-    // Handle clicks in fullscreen
-    if (fullscreenImg && fullscreenOverlay) {
-      fullscreenOverlay.addEventListener('click', (e) => {
-        if (e.target === fullscreenOverlay) {
-          const rect = fullscreenImg.getBoundingClientRect();
-          const x = Math.round((e.clientX - rect.left) * (fullscreenImg.naturalWidth / rect.width));
-          const y = Math.round((e.clientY - rect.top) * (fullscreenImg.naturalHeight / rect.height));
-          this.sendCommand('click', { button: 'left', x: x, y: y });
-        }
-      });
-
-      fullscreenOverlay.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        const rect = fullscreenImg.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) * (fullscreenImg.naturalWidth / rect.width));
-        const y = Math.round((e.clientY - rect.top) * (fullscreenImg.naturalHeight / rect.height));
-        this.sendCommand('click', { button: 'right', x: x, y: y });
-      });
-
-      // Handle scroll in fullscreen
-      fullscreenOverlay.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        const delta = Math.round(e.deltaY);
-        if (delta !== 0) {
-          this.sendCommand('scroll', { delta: delta });
-        }
-      });
-
-      // Handle mouse movement
-      let isDragging = false;
-      let lastMoveTime = 0;
-      fullscreenOverlay.addEventListener('mousedown', () => { isDragging = true; });
-      fullscreenOverlay.addEventListener('mouseup', () => { isDragging = false; });
-      fullscreenOverlay.addEventListener('mousemove', (e) => {
-        if (isDragging) {
-          const now = Date.now();
-          if (now - lastMoveTime > 50) {
-            const rect = fullscreenImg.getBoundingClientRect();
-            const x = Math.round((e.clientX - rect.left) * (fullscreenImg.naturalWidth / rect.width));
-            const y = Math.round((e.clientY - rect.top) * (fullscreenImg.naturalHeight / rect.height));
-            this.sendCommand('move_mouse', { x: x, y: y });
-            lastMoveTime = now;
-          }
-        }
-      });
-
-      // Handle errors
-      fullscreenImg.addEventListener('error', () => {
-        this.closeFullscreenRemote();
-      });
+    const streamImg = this._fullscreenOverlay.querySelector('.fullscreen-stream');
+    if (streamImg) {
+      this.setupFullscreenInteraction(streamImg, baseUrl);
     }
   }
 
   closeFullscreenRemote() {
-    if (this._fullscreenOverlay && this._fullscreenOverlay.parentElement) {
-      this._fullscreenOverlay.parentElement.removeChild(this._fullscreenOverlay);
+    if (this._fullscreenOverlay) {
+      this._fullscreenOverlay.remove();
+      this._fullscreenOverlay = null;
+      this._isFullscreenOpen = false;
     }
-    this._fullscreenOverlay = null;
-    this._isFullscreenOpen = false;
+  }
+
+  setupFullscreenInteraction(img, baseUrl) {
+    img.addEventListener('click', (e) => {
+      const rect = img.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+      this.sendCommand('click', { button: 'left', x: x, y: y });
+    });
+
+    img.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const rect = img.getBoundingClientRect();
+      const x = Math.round((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+      this.sendCommand('click', { button: 'right', x: x, y: y });
+    });
+
+    img.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.sendCommand('scroll', { delta: Math.round(e.deltaY) });
+    });
+
+    let isDragging = false;
+    img.addEventListener('mousedown', () => { isDragging = true; });
+    img.addEventListener('mouseup', () => { isDragging = false; });
+    img.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const rect = img.getBoundingClientRect();
+        const x = Math.round((e.clientX - rect.left) * (img.naturalWidth / rect.width));
+        const y = Math.round((e.clientY - rect.top) * (img.naturalHeight / rect.height));
+        this.sendCommand('move_mouse', { x: x, y: y });
+      }
+    });
   }
 
   sendCommand(service, data = {}) {
@@ -925,6 +1027,13 @@ class OpenCtrolRemoteCard extends HTMLElement {
       console.error(`OpenCtrol card: Error calling service ${service}:`, err);
     });
   }
+
+  _escapeHtml(text) {
+    if (text == null) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
 }
 
 // Define the custom element BEFORE registration
@@ -933,10 +1042,7 @@ if (!customElements.get('opencrol-remote-card')) {
 }
 
 // Card registration for Home Assistant card picker
-// Initialize window.customCards if it doesn't exist
 window.customCards = window.customCards || [];
-
-// Check if card is already registered
 const cardAlreadyRegistered = window.customCards.some(
   card => card.type === 'custom:opencrol-remote-card'
 );
@@ -950,8 +1056,6 @@ if (!cardAlreadyRegistered) {
     documentationURL: 'https://github.com/Kaando2000/opencrol-integration',
     author: 'Kaando2000'
   });
-  
-  // Log card registration for debugging
   console.log('OpenCtrol Remote card registered:', {
     type: 'custom:opencrol-remote-card',
     element: 'opencrol-remote-card',
@@ -961,10 +1065,8 @@ if (!cardAlreadyRegistered) {
   console.log('OpenCtrol Remote card already registered');
 }
 
-// Also register with Lovelace if available
 if (window.loadCardHelpers) {
   window.loadCardHelpers().then(({ createCardElement }) => {
-    // Card is now available
     console.log('OpenCtrol Remote card loaded successfully');
   }).catch(err => {
     console.error('Error loading OpenCtrol card helpers:', err);
@@ -972,4 +1074,3 @@ if (window.loadCardHelpers) {
 }
 
 })(); // End IIFE
-

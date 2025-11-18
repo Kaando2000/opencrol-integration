@@ -76,16 +76,25 @@ class OpenCtrolScreenViewer(
         host = self.entry.data.get("host", "localhost")
         port = self.entry.data.get("port", 8080)
         base_url = f"http://{host}:{port}"
+        data = self.coordinator.data
         
         return {
             "client_id": self.entry.data.get(ATTR_CLIENT_ID),
             "base_url": base_url,
             "stream_url": f"{base_url}/api/v1/screenstream/stream",
             "frame_url": f"{base_url}/api/v1/screenstream/frame",
-            "monitors": self.coordinator.data.get("monitors", []),
-            "current_monitor": self.coordinator.data.get("current_monitor", 0),
-            "total_monitors": self.coordinator.data.get("total_monitors", 0),
-            "master_volume": self.coordinator.data.get("master_volume", 0.0),
+            "status": data.get("status", "offline"),
+            "monitors": data.get("monitors", []),
+            "current_monitor": data.get("current_monitor", 0),
+            "total_monitors": data.get("total_monitors", 0),
+            "master_volume": data.get("master_volume", 0.0),
+            "screen_capture_active": data.get("screen_capture_active", False),
+            "audio_apps": data.get("audio_apps", []),
+            "audio_devices": data.get("audio_devices", []),
+            "default_output_device": next(
+                (d.get("id") for d in data.get("audio_devices", []) if d.get("is_default")),
+                None
+            ),
         }
 
     async def async_turn_on(self) -> None:

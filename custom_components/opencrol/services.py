@@ -19,6 +19,8 @@ SERVICE_SEND_KEY = "send_key"
 SERVICE_SECURE_ATTENTION = "secure_attention"
 SERVICE_SET_VOLUME = "set_volume"
 SERVICE_SET_APP_VOLUME = "set_app_volume"
+SERVICE_SET_APP_DEVICE = "set_app_device"
+SERVICE_SET_DEFAULT_DEVICE = "set_default_device"
 SERVICE_SELECT_MONITOR = "select_monitor"
 SERVICE_START_SCREEN_CAPTURE = "start_screen_capture"
 SERVICE_STOP_SCREEN_CAPTURE = "stop_screen_capture"
@@ -66,6 +68,11 @@ SERVICE_SCHEMA_SET_APP_VOLUME = vol.Schema({
     vol.Required("entity_id"): cv.entity_id,
     vol.Required("process_id"): vol.Coerce(int),
     vol.Required("volume"): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=1.0)),
+})
+
+SERVICE_SCHEMA_SET_DEFAULT_DEVICE = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
+    vol.Required("device_id"): cv.string,
 })
 
 SERVICE_SCHEMA_SELECT_MONITOR = vol.Schema({
@@ -209,6 +216,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if coordinator:
             await coordinator.send_command("send_to_secure_desktop", text=text)
 
+    async def handle_set_default_device(call: ServiceCall) -> None:
+        """Handle set_default_device service call."""
+        entity_id = call.data["entity_id"]
+        device_id = call.data["device_id"]
+
+        coordinator = _get_coordinator(hass, entity_id)
+        if coordinator:
+            await coordinator.send_command("set_default_device", device_id=device_id)
+
     async def handle_lock(call: ServiceCall) -> None:
         """Handle lock service call."""
         entity_id = call.data["entity_id"]
@@ -252,6 +268,9 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_SEND_TO_SECURE_DESKTOP, handle_send_to_secure_desktop, schema=SERVICE_SCHEMA_SEND_TO_SECURE_DESKTOP
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SET_DEFAULT_DEVICE, handle_set_default_device, schema=SERVICE_SCHEMA_SET_DEFAULT_DEVICE
     )
     hass.services.async_register(
         DOMAIN, SERVICE_LOCK, handle_lock, schema=SERVICE_SCHEMA_LOCK

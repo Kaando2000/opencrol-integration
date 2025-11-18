@@ -160,6 +160,23 @@ take_screenshot:
         entity:
           domain: media_player
 
+set_default_device:
+  name: Set Default Audio Device
+  description: Set the system default audio output device
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    device_id:
+      name: Device ID
+      description: Audio device ID to set as default
+      required: true
+      selector:
+        text:
+
 lock:
   name: Lock Workstation
   description: Lock the Windows workstation (Win+L equivalent)
