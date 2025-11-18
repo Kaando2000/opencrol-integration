@@ -3,6 +3,7 @@
 from datetime import timedelta
 import logging
 from typing import Any
+import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -54,8 +55,10 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
 
         try:
             # Get status
+            _LOGGER.debug("Fetching status from OpenCtrol client")
             status_data = await self._http_client.get_status()
             self._available = status_data.get("online", False)
+            _LOGGER.debug(f"Status response: online={self._available}, data keys: {list(status_data.keys())}")
 
             # Get monitors
             monitors_data = await self._http_client.get_monitors()
@@ -99,6 +102,10 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
             _LOGGER.warning(f"Timeout error: {ex}")
             self._available = False
             raise UpdateFailed(f"Connection timeout: {ex}") from ex
+        except aiohttp.ClientResponseError as ex:
+            _LOGGER.error(f"HTTP error {ex.status} getting status: {ex.message}")
+            self._available = False
+            raise UpdateFailed(f"HTTP error {ex.status}: {ex.message}") from ex
         except Exception as ex:
             _LOGGER.error(f"Error updating OpenCtrol data: {ex}", exc_info=True)
             self._available = False
@@ -143,6 +150,10 @@ class OpenCtrolCoordinator(DataUpdateCoordinator):
                 return await self._http_client.restart_client()
             elif command == "lock":
                 return await self._http_client.lock_workstation()
+            elif command == "shutdown_computer":
+                return await self._http_client.shutdown_computer()
+            elif command == "restart_computer":
+                return await self._http_client.restart_computer()
             elif command == "set_app_device":
                 return await self._http_client.set_app_device(
                     kwargs.get("process_id", 0),

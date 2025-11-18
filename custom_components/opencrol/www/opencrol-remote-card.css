@@ -98,16 +98,25 @@ opencrol-remote-card .icon-btn.active {
   color: white;
 }
 
-opencrol-remote-card .icon-btn#power-on-btn {
+opencrol-remote-card .icon-btn.power-btn {
   color: #4caf50;
 }
 
-opencrol-remote-card .icon-btn#power-off-btn {
+opencrol-remote-card .icon-btn.power-btn.active {
+  color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+opencrol-remote-card .icon-btn.computer-power-btn {
+  color: #f44336;
+}
+
+opencrol-remote-card .icon-btn.computer-restart-btn {
   color: #ff9800;
 }
 
-opencrol-remote-card .icon-btn#lock-btn {
-  color: #f44336;
+opencrol-remote-card .icon-btn.computer-wol-btn {
+  color: #4caf50;
 }
 
 opencrol-remote-card .monitor-icons {
@@ -169,8 +178,8 @@ opencrol-remote-card .touchpad-area {
   touch-action: none;
 }
 
-opencrol-remote-card .touchpad-area.hidden {
-  display: none;
+opencrol-remote-card .touchpad-area {
+  /* Touchpad is always visible when online - it's the main view */
 }
 
 opencrol-remote-card .touchpad-area.active {
@@ -204,31 +213,38 @@ opencrol-remote-card .touchpad-hint {
   margin: 0 auto;
 }
 
-/* Screen Stream */
-opencrol-remote-card .screen-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
+opencrol-remote-card .fullscreen-hint {
+  margin-top: 16px;
+}
+
+opencrol-remote-card .fullscreen-hint-btn {
+  background: var(--primary-color, #03a9f4);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95em;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  pointer-events: auto;
 }
 
-opencrol-remote-card .screen-stream {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+opencrol-remote-card .fullscreen-hint-btn:hover {
+  background: var(--primary-color-dark, #0288d1);
+  transform: translateY(-1px);
 }
 
-opencrol-remote-card .screen-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  cursor: crosshair;
+opencrol-remote-card .fullscreen-hint-btn:active {
+  transform: translateY(0);
+}
+
+opencrol-remote-card .fullscreen-hint-btn ha-icon {
+  width: 18px;
+  height: 18px;
 }
 
 opencrol-remote-card .fullscreen-btn {

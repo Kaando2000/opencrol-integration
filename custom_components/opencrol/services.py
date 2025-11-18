@@ -25,6 +25,9 @@ SERVICE_SELECT_MONITOR = "select_monitor"
 SERVICE_START_SCREEN_CAPTURE = "start_screen_capture"
 SERVICE_STOP_SCREEN_CAPTURE = "stop_screen_capture"
 SERVICE_SEND_TO_SECURE_DESKTOP = "send_to_secure_desktop"
+SERVICE_SHUTDOWN_COMPUTER = "shutdown_computer"
+SERVICE_RESTART_COMPUTER = "restart_computer"
+SERVICE_WAKE_ON_LAN = "wake_on_lan"
 
 SERVICE_SCHEMA_MOVE_MOUSE = vol.Schema({
     vol.Required("entity_id"): cv.entity_id,
@@ -95,6 +98,21 @@ SERVICE_SCHEMA_SEND_TO_SECURE_DESKTOP = vol.Schema({
 
 SERVICE_SCHEMA_LOCK = vol.Schema({
     vol.Required("entity_id"): cv.entity_id,
+})
+
+SERVICE_SCHEMA_SHUTDOWN_COMPUTER = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
+})
+
+SERVICE_SCHEMA_RESTART_COMPUTER = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
+})
+
+SERVICE_SCHEMA_WAKE_ON_LAN = vol.Schema({
+    vol.Required("entity_id"): cv.entity_id,
+    vol.Optional("mac_address"): cv.string,
+    vol.Optional("broadcast_address"): cv.string,
+    vol.Optional("broadcast_port"): cv.port,
 })
 
 
@@ -233,6 +251,71 @@ def async_setup_services(hass: HomeAssistant) -> None:
         if coordinator:
             await coordinator.send_command("lock")
 
+    async def handle_shutdown_computer(call: ServiceCall) -> None:
+        """Handle shutdown_computer service call."""
+        entity_id = call.data["entity_id"]
+
+        coordinator = _get_coordinator(hass, entity_id)
+        if coordinator:
+            await coordinator.send_command("shutdown_computer")
+
+    async def handle_restart_computer(call: ServiceCall) -> None:
+        """Handle restart_computer service call."""
+        entity_id = call.data["entity_id"]
+
+        coordinator = _get_coordinator(hass, entity_id)
+        if coordinator:
+            await coordinator.send_command("restart_computer")
+
+    async def handle_wake_on_lan(call: ServiceCall) -> None:
+        """Handle wake_on_lan service call."""
+        entity_id = call.data["entity_id"]
+        mac_address = call.data.get("mac_address")
+        broadcast_address = call.data.get("broadcast_address", "255.255.255.255")
+        broadcast_port = call.data.get("broadcast_port", 9)
+
+        # Get MAC address from config entry if not provided
+        if not mac_address:
+            try:
+                from homeassistant.helpers import entity_registry as er
+                entity_registry = er.async_get(hass)
+                if entity := entity_registry.async_get(entity_id):
+                    entry_id = entity.config_entry_id
+                    if entry_id:
+                        config_entry = hass.config_entries.async_get_entry(entry_id)
+                        if config_entry:
+                            mac_address = config_entry.data.get("mac_address")
+            except Exception as ex:
+                _LOGGER.warning(f"Could not get MAC address from config entry: {ex}")
+
+        if not mac_address:
+            _LOGGER.error("MAC address is required for Wake-on-LAN. Please provide it in the service call or in the integration configuration.")
+            return
+
+        # Use Home Assistant's wake_on_lan service
+        try:
+            await hass.services.async_call(
+                "wake_on_lan",
+                "send_magic_packet",
+                {
+                    "mac": mac_address,
+                    "broadcast_address": broadcast_address,
+                    "broadcast_port": broadcast_port,
+                },
+            )
+            _LOGGER.info(f"Wake-on-LAN packet sent to {mac_address}")
+        except Exception as ex:
+            _LOGGER.error(f"Error sending Wake-on-LAN packet: {ex}")
+            # Try alternative method if wake_on_lan component not available
+            try:
+                import wakeonlan
+                wakeonlan.send_magic_packet(mac_address, ip_address=broadcast_address, port=broadcast_port)
+                _LOGGER.info(f"Wake-on-LAN packet sent via wakeonlan library to {mac_address}")
+            except ImportError:
+                _LOGGER.error("Wake-on-LAN requires either the wake_on_lan Home Assistant component or the wakeonlan Python package")
+            except Exception as ex2:
+                _LOGGER.error(f"Error with alternative WOL method: {ex2}")
+
     hass.services.async_register(
         DOMAIN, SERVICE_MOVE_MOUSE, handle_move_mouse, schema=SERVICE_SCHEMA_MOVE_MOUSE
     )
@@ -274,6 +357,15 @@ def async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN, SERVICE_LOCK, handle_lock, schema=SERVICE_SCHEMA_LOCK
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_SHUTDOWN_COMPUTER, handle_shutdown_computer, schema=SERVICE_SCHEMA_SHUTDOWN_COMPUTER
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_RESTART_COMPUTER, handle_restart_computer, schema=SERVICE_SCHEMA_RESTART_COMPUTER
+    )
+    hass.services.async_register(
+        DOMAIN, SERVICE_WAKE_ON_LAN, handle_wake_on_lan, schema=SERVICE_SCHEMA_WAKE_ON_LAN
     )
 
 

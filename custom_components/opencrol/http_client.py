@@ -484,6 +484,42 @@ class OpenCtrolHttpClient:
             if response:
                 response.close()
 
+    async def shutdown_computer(self) -> bool:
+        """Shutdown the computer."""
+        response = None
+        try:
+            response = await self._retry_request(
+                "POST",
+                f"{self.base_url}/api/v1/system/shutdown"
+            )
+            response.raise_for_status()
+            data = await response.json()
+            return data.get("success", False)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            _LOGGER.error(f"Error shutting down computer: {ex}")
+            return False
+        finally:
+            if response:
+                response.close()
+
+    async def restart_computer(self) -> bool:
+        """Restart the computer."""
+        response = None
+        try:
+            response = await self._retry_request(
+                "POST",
+                f"{self.base_url}/api/v1/system/restart-computer"
+            )
+            response.raise_for_status()
+            data = await response.json()
+            return data.get("success", False)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as ex:
+            _LOGGER.error(f"Error restarting computer: {ex}")
+            return False
+        finally:
+            if response:
+                response.close()
+
     async def set_app_device(self, process_id: int, device_id: str) -> bool:
         """Set app output device."""
         response = None

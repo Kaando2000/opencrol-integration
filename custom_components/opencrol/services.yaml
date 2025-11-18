@@ -188,3 +188,55 @@ lock:
         entity:
           domain: media_player
 
+shutdown_computer:
+  name: Shutdown Computer
+  description: Shutdown the Windows computer
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+
+restart_computer:
+  name: Restart Computer
+  description: Restart the Windows computer
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+
+wake_on_lan:
+  name: Wake on LAN
+  description: Send Wake-on-LAN magic packet to turn on the computer
+  fields:
+    entity_id:
+      name: Entity
+      description: OpenCtrol client entity
+      selector:
+        entity:
+          domain: media_player
+    mac_address:
+      name: MAC Address
+      description: MAC address of the network adapter (optional if configured in integration settings)
+      selector:
+        text:
+    broadcast_address:
+      name: Broadcast Address
+      description: Broadcast address for WOL packet (default: 255.255.255.255)
+      default: "255.255.255.255"
+      selector:
+        text:
+    broadcast_port:
+      name: Broadcast Port
+      description: Port for WOL packet (default: 9)
+      default: 9
+      selector:
+        number:
+          min: 1
+          max: 65535
+

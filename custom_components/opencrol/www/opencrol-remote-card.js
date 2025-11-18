@@ -114,7 +114,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
     const isScreenCaptureActive = attributes.screen_capture_active !== undefined ? attributes.screen_capture_active : false;
     const shouldShowStream = isOnline && this._screenStreamUrl && isScreenCaptureActive;
 
-    // New compact title bar with icons only
+    // Header with status, power button, monitors, sound, keyboard
     this.innerHTML = `
       <ha-card>
         <div class="card-header-compact">
@@ -126,56 +126,59 @@ class OpenCtrolRemoteCard extends HTMLElement {
           </div>
           <div class="header-icons-compact">
             ${isOnline ? `
-              <button class="icon-btn ${isScreenCaptureActive ? 'active' : ''}" id="power-on-btn" title="Turn On Screen">
-                <ha-icon icon="mdi:power"></ha-icon>
+              <button class="icon-btn power-btn ${isScreenCaptureActive ? 'active' : ''}" id="power-btn" 
+                      title="${isScreenCaptureActive ? 'Turn Off Screen' : 'Turn On Screen'}">
+                <ha-icon icon="${isScreenCaptureActive ? 'mdi:power' : 'mdi:power-off'}"></ha-icon>
               </button>
-              <button class="icon-btn ${!isScreenCaptureActive ? 'active' : ''}" id="power-off-btn" title="Turn Off Screen">
+              <button class="icon-btn computer-power-btn" id="computer-power-off-btn" 
+                      title="Shutdown Computer">
                 <ha-icon icon="mdi:power-off"></ha-icon>
               </button>
+              <button class="icon-btn computer-restart-btn" id="computer-restart-btn" 
+                      title="Restart Computer">
+                <ha-icon icon="mdi:restart"></ha-icon>
+              </button>
+            ` : `
+              <button class="icon-btn computer-wol-btn" id="computer-wol-btn" 
+                      title="Wake on LAN - Turn On Computer">
+                <ha-icon icon="mdi:power-on"></ha-icon>
+              </button>
+            `}
+            ${monitors.length > 0 ? `
+              <div class="monitor-icons" title="Monitor Selection">
+                ${monitors.map((monitor, index) => `
+                  <button class="icon-btn monitor-icon ${index === currentMonitor ? 'active' : ''}" 
+                          data-monitor-index="${index}" 
+                          title="Monitor ${index + 1}">
+                    ${index + 1}
+                  </button>
+                `).join('')}
+              </div>
             ` : ''}
-            <div class="monitor-icons" title="Monitor Selection">
-              ${monitors.length > 0 ? monitors.map((monitor, index) => `
-                <button class="icon-btn monitor-icon ${index === currentMonitor ? 'active' : ''}" 
-                        data-monitor-index="${index}" 
-                        title="Monitor ${index + 1}">
-                  ${index + 1}
-                </button>
-              `).join('') : ''}
-            </div>
             <button class="icon-btn" id="sound-btn" title="Sound Mixer">
               <ha-icon icon="mdi:volume-high"></ha-icon>
             </button>
             <button class="icon-btn" id="keyboard-btn" title="Keyboard">
               <ha-icon icon="mdi:keyboard"></ha-icon>
             </button>
-            <button class="icon-btn" id="lock-btn" title="Lock Workstation">
-              <ha-icon icon="mdi:lock"></ha-icon>
-            </button>
           </div>
         </div>
         
         <div class="card-content">
-          <!-- Big Touchpad Area -->
+          <!-- Big Touchpad Area - Main view, always visible when online -->
           <div class="touchpad-container ${!isOnline ? 'offline' : ''}" id="touchpad-container">
-            ${shouldShowStream ? `
-              <div class="screen-wrapper">
-                <img id="screen-stream" 
-                     src="${this._screenStreamUrl}" 
-                     alt="Screen Stream"
-                     class="screen-stream"
-                     loading="eager"
-                     style="display: none;">
-                <div id="screen-overlay" class="screen-overlay" style="display: none;"></div>
-                <button class="fullscreen-btn" title="Fullscreen" aria-label="Open Fullscreen" style="display: none;">
-                  <ha-icon icon="mdi:fullscreen"></ha-icon>
-                </button>
-              </div>
-            ` : ''}
-            <div class="touchpad-area ${shouldShowStream && isScreenCaptureActive ? 'hidden' : ''}" id="touchpad-area">
+            <div class="touchpad-area" id="touchpad-area">
               <div class="touchpad-visual">
                 <div class="touchpad-icon">${isOnline ? '🖱️' : '📴'}</div>
                 <div class="touchpad-text">${isOnline ? 'Touchpad' : 'Device Offline'}</div>
                 <div class="touchpad-hint">${isOnline ? 'Drag to move mouse • Tap to click • Scroll with two fingers' : 'Waiting for connection...'}</div>
+                ${isOnline && isScreenCaptureActive ? `
+                  <div class="fullscreen-hint">
+                    <button class="fullscreen-hint-btn" id="fullscreen-hint-btn" title="View Screen in Fullscreen">
+                      <ha-icon icon="mdi:fullscreen"></ha-icon> View Screen
+                    </button>
+                  </div>
+                ` : ''}
               </div>
             </div>
           </div>
@@ -397,8 +400,8 @@ class OpenCtrolRemoteCard extends HTMLElement {
 
   setupTouchpadMode() {
     const touchpadArea = this.querySelector('#touchpad-area');
-    // Only setup if touchpad exists and is visible (not hidden)
-    if (!touchpadArea || touchpadArea.classList.contains('hidden')) return;
+    // Only setup if touchpad exists
+    if (!touchpadArea) return;
     
     // Prevent duplicate event listeners by checking if already set up
     if (touchpadArea.dataset.touchpadSetup === 'true') return;
@@ -534,132 +537,12 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 
   setupScreenInteraction() {
-    const screenOverlay = this.querySelector('#screen-overlay');
-    const screenImg = this.querySelector('#screen-stream');
-    const touchpadArea = this.querySelector('#touchpad-area');
-    const screenContainer = this.querySelector('#touchpad-container');
-    
-    if (!screenImg || !screenOverlay) {
-      if (touchpadArea) {
-        touchpadArea.classList.remove('hidden');
-      }
-      return;
-    }
-
-    this._imgElement = screenImg;
-
-    // Click handling
-    screenOverlay.addEventListener('click', (e) => {
-      if (e.target === screenOverlay || e.target.classList.contains('screen-overlay')) {
-        const rect = screenImg.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-        this.sendCommand('click', { button: 'left', x: x, y: y });
-      }
-    });
-
-    screenOverlay.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      const rect = screenImg.getBoundingClientRect();
-      const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-      const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-      this.sendCommand('click', { button: 'right', x: x, y: y });
-    });
-
-    // Mouse movement
-    let isDragging = false;
-    screenOverlay.addEventListener('mousedown', () => { isDragging = true; });
-    screenOverlay.addEventListener('mouseup', () => { isDragging = false; });
-    screenOverlay.addEventListener('mousemove', (e) => {
-      if (isDragging) {
-        const rect = screenImg.getBoundingClientRect();
-        const x = Math.round((e.clientX - rect.left) * (screenImg.naturalWidth / rect.width));
-        const y = Math.round((e.clientY - rect.top) * (screenImg.naturalHeight / rect.height));
-        this.sendCommand('move_mouse', { x: x, y: y });
-      }
-    });
-
-    screenOverlay.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      this.sendCommand('scroll', { delta: Math.round(e.deltaY) });
-    });
-
-    // Always setup touchpad first
-    if (touchpadArea) {
-      this.setupTouchpadMode();
-    }
-
-    // Stream load handlers
-    screenImg.addEventListener('load', () => {
-      if (screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
-        screenImg.style.display = 'block';
-        screenOverlay.style.display = 'block';
-        const fullscreenBtn = this.querySelector('.fullscreen-btn');
-        if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
-        if (touchpadArea) touchpadArea.classList.add('hidden');
-      }
-    });
-    
-    screenImg.addEventListener('error', () => {
-      screenImg.style.display = 'none';
-      screenOverlay.style.display = 'none';
-      const fullscreenBtn = this.querySelector('.fullscreen-btn');
-      if (fullscreenBtn) fullscreenBtn.style.display = 'none';
-      if (touchpadArea) touchpadArea.classList.remove('hidden');
-    });
-    
-    // Try to start screen capture if online (stream endpoint auto-starts capture)
-    const entityForCapture = this._hass.states[this.config.entity];
-    const attrsForCapture = entityForCapture?.attributes || {};
-    const statusForCapture = attrsForCapture.status || 'offline';
-    const isOnlineForCapture = statusForCapture === 'online';
-    const isCaptureActiveForCapture = attrsForCapture.screen_capture_active || false;
-    const currentMonitorForCapture = attrsForCapture.current_monitor !== undefined ? attrsForCapture.current_monitor : 0;
-    
-    if (isOnlineForCapture && this.config.entity && screenImg) {
-      // The stream endpoint auto-starts capture when accessed, but we call start_screen_capture
-      // to ensure status is updated correctly
-      if (!isCaptureActiveForCapture) {
-        setTimeout(() => {
-          this._hass.callService('opencrol', 'start_screen_capture', {
-            entity_id: this.config.entity,
-          }).then(() => {
-            // Refresh stream after starting capture
-            setTimeout(() => {
-              if (screenImg && this._screenStreamUrl) {
-                const baseUrl = this._screenStreamUrl.split('?')[0];
-                const monitorPart = this._screenStreamUrl.includes('monitor=') 
-                  ? this._screenStreamUrl.split('monitor=')[1].split('&')[0]
-                  : currentMonitorForCapture;
-                screenImg.src = `${baseUrl}?monitor=${monitorPart}&_t=${Date.now()}`;
-              }
-            }, 800);
-          }).catch(err => {
-            console.error('Failed to start screen capture:', err);
-          });
-        }, 300);
-      } else {
-        // Already active, refresh stream URL to get latest frames
-        if (screenImg && this._screenStreamUrl) {
-          const baseUrl = this._screenStreamUrl.split('?')[0];
-          const monitorPart = this._screenStreamUrl.includes('monitor=') 
-            ? this._screenStreamUrl.split('monitor=')[1].split('&')[0]
-            : currentMonitorForCapture;
-          screenImg.src = `${baseUrl}?monitor=${monitorPart}&_t=${Date.now()}`;
-        }
-      }
-    }
-    
-    // Check if image already loaded
-    if (screenImg && screenImg.complete && screenImg.naturalWidth > 0 && screenImg.naturalHeight > 0) {
-      screenImg.dispatchEvent(new Event('load'));
-    }
-
-    // Fullscreen button
-    const fullscreenBtn = this.querySelector('.fullscreen-btn');
-    if (fullscreenBtn) {
-      fullscreenBtn.addEventListener('click', (e) => {
+    // Fullscreen hint button - opens fullscreen view of screen
+    const fullscreenHintBtn = this.querySelector('#fullscreen-hint-btn');
+    if (fullscreenHintBtn) {
+      fullscreenHintBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         const entityForFullscreen = this._hass.states[this.config.entity];
         const attrsForFullscreen = entityForFullscreen?.attributes || {};
         const baseUrl = this.config.base_url || this.getBaseUrlFromEntity(entityForFullscreen);
@@ -670,42 +553,118 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 
   attachEventHandlers() {
-    // Power buttons
-    const powerOnBtn = this.querySelector('#power-on-btn');
-    if (powerOnBtn) {
-      powerOnBtn.addEventListener('click', () => {
-        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
-        if (this._hass.states[mediaEntityId]) {
-          this._hass.callService('media_player', 'turn_on', { entity_id: mediaEntityId }).catch(() => {
-            this.sendCommand('start_screen_capture');
-          });
-        } else {
-          this.sendCommand('start_screen_capture');
-        }
-      });
-    }
-
-    const powerOffBtn = this.querySelector('#power-off-btn');
-    if (powerOffBtn) {
-      powerOffBtn.addEventListener('click', () => {
-        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
-        if (this._hass.states[mediaEntityId]) {
-          this._hass.callService('media_player', 'turn_off', { entity_id: mediaEntityId }).catch(() => {
+    // Power button (toggle)
+    const powerBtn = this.querySelector('#power-btn');
+    if (powerBtn) {
+      powerBtn.addEventListener('click', () => {
+        const entity = this._hass.states[this.config.entity];
+        const attributes = entity?.attributes || {};
+        const isActive = attributes.screen_capture_active || false;
+        
+        if (isActive) {
+          // Turn off
+          const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+          if (this._hass.states[mediaEntityId]) {
+            this._hass.callService('media_player', 'turn_off', { entity_id: mediaEntityId }).catch(() => {
+              this.sendCommand('stop_screen_capture');
+            });
+          } else {
             this.sendCommand('stop_screen_capture');
-          });
+          }
         } else {
-          this.sendCommand('stop_screen_capture');
+          // Turn on
+          const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+          if (this._hass.states[mediaEntityId]) {
+            this._hass.callService('media_player', 'turn_on', { entity_id: mediaEntityId }).catch(() => {
+              this.sendCommand('start_screen_capture');
+            });
+          } else {
+            this.sendCommand('start_screen_capture');
+          }
         }
       });
     }
 
-    // Lock button
-    const lockBtn = this.querySelector('#lock-btn');
-    if (lockBtn) {
-      lockBtn.addEventListener('click', () => {
-        this.sendCommand('lock');
+    // Computer power off button
+    const computerPowerOffBtn = this.querySelector('#computer-power-off-btn');
+    if (computerPowerOffBtn) {
+      computerPowerOffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (confirm('Are you sure you want to shutdown the computer?')) {
+          this._hass.callService('opencrol', 'shutdown_computer', {
+            entity_id: this.config.entity
+          }).catch(err => {
+            console.error('Failed to shutdown computer:', err);
+          });
+        }
       });
     }
+
+    // Computer restart button
+    const computerRestartBtn = this.querySelector('#computer-restart-btn');
+    if (computerRestartBtn) {
+      computerRestartBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (confirm('Are you sure you want to restart the computer?')) {
+          this._hass.callService('opencrol', 'restart_computer', {
+            entity_id: this.config.entity
+          }).catch(err => {
+            console.error('Failed to restart computer:', err);
+          });
+        }
+      });
+    }
+
+    // Wake on LAN button (when offline)
+    const computerWolBtn = this.querySelector('#computer-wol-btn');
+    if (computerWolBtn) {
+      computerWolBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        // Get MAC address from config entry
+        let macAddress = null;
+        try {
+          const entity = this._hass.states[this.config.entity];
+          const attributes = entity?.attributes || {};
+          macAddress = attributes.mac_address;
+        } catch (err) {
+          console.warn('Could not get MAC address from attributes:', err);
+        }
+        
+        if (!macAddress) {
+          // Try to get from config entry
+          try {
+            const configEntries = this._hass.config_entries?.entries || [];
+            for (const entry of configEntries) {
+              if (entry.domain === 'opencrol' && entry.data) {
+                if (entry.data.host && this.config.base_url?.includes(entry.data.host)) {
+                  macAddress = entry.data.mac_address;
+                  break;
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Could not get MAC address from config entry:', err);
+          }
+        }
+
+        if (!macAddress) {
+          macAddress = prompt('Please enter the MAC address for Wake-on-LAN:');
+          if (!macAddress) return;
+        }
+
+        this._hass.callService('opencrol', 'wake_on_lan', {
+          entity_id: this.config.entity,
+          mac_address: macAddress
+        }).catch(err => {
+          console.error('Failed to send Wake-on-LAN packet:', err);
+          alert('Failed to send Wake-on-LAN packet. Please check the MAC address and ensure the computer supports WOL.');
+        });
+      });
+    }
+
 
     // Monitor buttons
     this.querySelectorAll('.monitor-icon').forEach(btn => {
