@@ -85,20 +85,27 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             self._password_step_data = {
                                 "host": host,
                                 "port": port,
-                                "client_id": client_id
+                                "client_id": client_id,
+                                "mac_address": properties.get("mac_address", "")
                             }
                             return await self.async_step_password()
                         else:
                             # No password required, create entry directly
+                            entry_data = {
+                                "host": host,
+                                "port": port,
+                                "client_id": client_id,
+                                "password": "",
+                                "base_url": f"http://{host}:{port}"
+                            }
+                            # Check if MAC address is in properties
+                            mac_address = properties.get("mac_address", "")
+                            if mac_address:
+                                entry_data["mac_address"] = mac_address
+                            
                             return await self.async_create_entry(
                                 title=f"OpenCtrol - {client_id}",
-                                data={
-                                    "host": host,
-                                    "port": port,
-                                    "client_id": client_id,
-                                    "password": "",
-                                    "base_url": f"http://{host}:{port}"
-                                }
+                                data=entry_data
                             )
                     else:
                         errors["base"] = "invalid_device"
@@ -306,6 +313,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         host = self._password_step_data.get("host", "")
         port = self._password_step_data.get("port", 8080)
         client_id = self._password_step_data.get("client_id", host)
+        default_mac_address = self._password_step_data.get("mac_address", "")
         
         # Validate host is not empty
         if not host:
@@ -322,6 +330,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         
         if user_input is not None and "password" in user_input:
             password = user_input.get("password", "").strip()
+            mac_address = user_input.get("mac_address", "").strip()
             
             # Test connection with password
             import aiohttp
@@ -353,15 +362,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                     _LOGGER.warning(f"Unexpected response type: {type(status_data)}")
                                     actual_client_id = client_id
                                 _LOGGER.info(f"Connection successful. Client ID: {actual_client_id}")
+                                
+                                entry_data = {
+                                    "host": host,
+                                    "port": port,
+                                    "client_id": actual_client_id,
+                                    "password": password,
+                                    "base_url": base_url
+                                }
+                                if mac_address:
+                                    entry_data["mac_address"] = mac_address
+                                
                                 return self.async_create_entry(
                                     title=f"OpenCtrol - {actual_client_id}",
-                                    data={
-                                        "host": host,
-                                        "port": port,
-                                        "client_id": actual_client_id,
-                                        "password": password,
-                                        "base_url": base_url
-                                    }
+                                    data=entry_data
                                 )
                             except Exception as json_ex:
                                 _LOGGER.error(f"Error parsing JSON response: {json_ex}", exc_info=True)
@@ -427,6 +441,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="password",
             data_schema=vol.Schema({
                 vol.Required("password"): str,
+                vol.Optional("mac_address", default=default_mac_address): str,
             }),
             errors=errors,
             description_placeholders={
@@ -538,20 +553,27 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._password_step_data = {
                     "host": host,
                     "port": port,
-                    "client_id": client_id
+                    "client_id": client_id,
+                    "mac_address": properties.get("mac_address", "")
                 }
                 return await self.async_step_password()
             else:
                 # No password required, create entry directly
+                entry_data = {
+                    "host": host,
+                    "port": port,
+                    "client_id": client_id,
+                    "password": "",
+                    "base_url": f"http://{host}:{port}"
+                }
+                # Check if MAC address is in properties
+                mac_address = properties.get("mac_address", "")
+                if mac_address:
+                    entry_data["mac_address"] = mac_address
+                
                 return self.async_create_entry(
                     title=f"OpenCtrol - {client_id}",
-                    data={
-                        "host": host,
-                        "port": port,
-                        "client_id": client_id,
-                        "password": "",
-                        "base_url": f"http://{host}:{port}"
-                    }
+                    data=entry_data
                 )
                 
         except ImportError as ex:

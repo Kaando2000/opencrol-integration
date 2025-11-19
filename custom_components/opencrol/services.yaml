@@ -227,13 +227,13 @@ wake_on_lan:
         text:
     broadcast_address:
       name: Broadcast Address
-      description: Broadcast address for WOL packet (default: 255.255.255.255)
-      default: "255.255.255.255"
+      description: Broadcast address for WOL packet
+      default: 255.255.255.255
       selector:
         text:
     broadcast_port:
       name: Broadcast Port
-      description: Port for WOL packet (default: 9)
+      description: Port for WOL packet
       default: 9
       selector:
         number:

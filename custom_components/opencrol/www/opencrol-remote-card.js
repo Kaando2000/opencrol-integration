@@ -125,36 +125,35 @@ class OpenCtrolRemoteCard extends HTMLElement {
             <div class="client-name">${this._escapeHtml(clientId)}</div>
           </div>
           <div class="header-icons-compact">
-            ${isOnline ? `
-              <button class="icon-btn power-btn ${isScreenCaptureActive ? 'active' : ''}" id="power-btn" 
-                      title="${isScreenCaptureActive ? 'Turn Off Screen' : 'Turn On Screen'}">
-                <ha-icon icon="${isScreenCaptureActive ? 'mdi:power' : 'mdi:power-off'}"></ha-icon>
+            <div class="power-menu-container">
+              <button class="icon-btn power-btn" id="power-btn" title="Power Options">
+                <ha-icon icon="${isOnline ? 'mdi:power' : 'mdi:power-off'}"></ha-icon>
               </button>
-              <button class="icon-btn computer-power-btn" id="computer-power-off-btn" 
-                      title="Shutdown Computer">
-                <ha-icon icon="mdi:power-off"></ha-icon>
-              </button>
-              <button class="icon-btn computer-restart-btn" id="computer-restart-btn" 
-                      title="Restart Computer">
-                <ha-icon icon="mdi:restart"></ha-icon>
-              </button>
-            ` : `
-              <button class="icon-btn computer-wol-btn" id="computer-wol-btn" 
-                      title="Wake on LAN - Turn On Computer">
-                <ha-icon icon="mdi:power-on"></ha-icon>
-              </button>
-            `}
-            ${monitors.length > 0 ? `
-              <div class="monitor-icons" title="Monitor Selection">
-                ${monitors.map((monitor, index) => `
-                  <button class="icon-btn monitor-icon ${index === currentMonitor ? 'active' : ''}" 
-                          data-monitor-index="${index}" 
-                          title="Monitor ${index + 1}">
-                    ${index + 1}
+              <div class="dropdown-menu power-menu" id="power-menu">
+                ${isOnline ? `
+                  <button class="dropdown-item" id="screen-on-btn" ${isScreenCaptureActive ? 'disabled' : ''}>
+                    <ha-icon icon="mdi:monitor"></ha-icon> Screen On
                   </button>
-                `).join('')}
+                  <button class="dropdown-item" id="screen-off-btn" ${!isScreenCaptureActive ? 'disabled' : ''}>
+                    <ha-icon icon="mdi:monitor-off"></ha-icon> Screen Off
+                  </button>
+                  <div class="dropdown-divider"></div>
+                  <button class="dropdown-item" id="computer-restart-btn">
+                    <ha-icon icon="mdi:restart"></ha-icon> Restart Computer
+                  </button>
+                  <button class="dropdown-item computer-power-off" id="computer-power-off-btn">
+                    <ha-icon icon="mdi:power-off"></ha-icon> Shutdown Computer
+                  </button>
+                ` : `
+                  <button class="dropdown-item computer-wol" id="computer-wol-btn">
+                    <ha-icon icon="mdi:power-on"></ha-icon> Wake on LAN
+                  </button>
+                `}
               </div>
-            ` : ''}
+            </div>
+            <button class="icon-btn" id="monitors-btn" title="Monitor Selection">
+              <ha-icon icon="mdi:monitor-multiple"></ha-icon>
+            </button>
             <button class="icon-btn" id="sound-btn" title="Sound Mixer">
               <ha-icon icon="mdi:volume-high"></ha-icon>
             </button>
@@ -308,6 +307,31 @@ class OpenCtrolRemoteCard extends HTMLElement {
                 <button class="keyboard-key shortcut" data-keys="WIN+L">Win+L</button>
                 <button class="keyboard-key shortcut" data-keys="WIN+R">Win+R</button>
               </div>
+            </div>
+          </div>
+
+          <!-- Monitor Selection Popup Menu -->
+          <div class="popup-menu monitors-menu" id="monitors-menu">
+            <div class="popup-header">
+              <div class="popup-title">Monitor Selection</div>
+              <button class="popup-close" aria-label="Close">
+                <ha-icon icon="mdi:close"></ha-icon>
+              </button>
+            </div>
+            <div class="popup-content">
+              ${monitors.length > 0 ? `
+                <div class="monitor-list">
+                  ${monitors.map((monitor, index) => `
+                    <button class="monitor-item ${index === currentMonitor ? 'active' : ''}" 
+                            data-monitor-index="${index}" 
+                            title="Monitor ${index + 1}">
+                      <ha-icon icon="mdi:monitor"></ha-icon>
+                      <span>Monitor ${index + 1}</span>
+                      ${index === currentMonitor ? '<ha-icon icon="mdi:check" class="check-icon"></ha-icon>' : ''}
+                    </button>
+                  `).join('')}
+                </div>
+              ` : '<div class="no-monitors">No monitors detected</div>'}
             </div>
           </div>
 
@@ -553,35 +577,59 @@ class OpenCtrolRemoteCard extends HTMLElement {
   }
 
   attachEventHandlers() {
-    // Power button (toggle)
+    // Power dropdown menu
     const powerBtn = this.querySelector('#power-btn');
-    if (powerBtn) {
-      powerBtn.addEventListener('click', () => {
-        const entity = this._hass.states[this.config.entity];
-        const attributes = entity?.attributes || {};
-        const isActive = attributes.screen_capture_active || false;
-        
-        if (isActive) {
-          // Turn off
-          const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
-          if (this._hass.states[mediaEntityId]) {
-            this._hass.callService('media_player', 'turn_off', { entity_id: mediaEntityId }).catch(() => {
-              this.sendCommand('stop_screen_capture');
-            });
-          } else {
-            this.sendCommand('stop_screen_capture');
-          }
+    const powerMenu = this.querySelector('#power-menu');
+    if (powerBtn && powerMenu) {
+      powerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isOpen = powerMenu.classList.contains('open');
+        // Close all other menus
+        this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => {
+          if (menu !== powerMenu) menu.classList.remove('open');
+        });
+        if (isOpen) {
+          powerMenu.classList.remove('open');
         } else {
-          // Turn on
-          const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
-          if (this._hass.states[mediaEntityId]) {
-            this._hass.callService('media_player', 'turn_on', { entity_id: mediaEntityId }).catch(() => {
-              this.sendCommand('start_screen_capture');
-            });
-          } else {
-            this.sendCommand('start_screen_capture');
-          }
+          powerMenu.classList.add('open');
         }
+      });
+    }
+
+    // Screen On button
+    const screenOnBtn = this.querySelector('#screen-on-btn');
+    if (screenOnBtn) {
+      screenOnBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+        if (this._hass.states[mediaEntityId]) {
+          this._hass.callService('media_player', 'turn_on', { entity_id: mediaEntityId }).catch(() => {
+            this.sendCommand('start_screen_capture');
+          });
+        } else {
+          this.sendCommand('start_screen_capture');
+        }
+        if (powerMenu) powerMenu.classList.remove('open');
+      });
+    }
+
+    // Screen Off button
+    const screenOffBtn = this.querySelector('#screen-off-btn');
+    if (screenOffBtn) {
+      screenOffBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const mediaEntityId = this.config.entity.replace('remote.', 'media_player.').replace('_remote', '_screen');
+        if (this._hass.states[mediaEntityId]) {
+          this._hass.callService('media_player', 'turn_off', { entity_id: mediaEntityId }).catch(() => {
+            this.sendCommand('stop_screen_capture');
+          });
+        } else {
+          this.sendCommand('stop_screen_capture');
+        }
+        if (powerMenu) powerMenu.classList.remove('open');
       });
     }
 
@@ -598,6 +646,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
             console.error('Failed to shutdown computer:', err);
           });
         }
+        if (powerMenu) powerMenu.classList.remove('open');
       });
     }
 
@@ -614,6 +663,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
             console.error('Failed to restart computer:', err);
           });
         }
+        if (powerMenu) powerMenu.classList.remove('open');
       });
     }
 
@@ -623,7 +673,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
       computerWolBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
-        // Get MAC address from config entry
+        // Get MAC address from entity attributes (set from config entry)
         let macAddress = null;
         try {
           const entity = this._hass.states[this.config.entity];
@@ -632,27 +682,11 @@ class OpenCtrolRemoteCard extends HTMLElement {
         } catch (err) {
           console.warn('Could not get MAC address from attributes:', err);
         }
-        
-        if (!macAddress) {
-          // Try to get from config entry
-          try {
-            const configEntries = this._hass.config_entries?.entries || [];
-            for (const entry of configEntries) {
-              if (entry.domain === 'opencrol' && entry.data) {
-                if (entry.data.host && this.config.base_url?.includes(entry.data.host)) {
-                  macAddress = entry.data.mac_address;
-                  break;
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('Could not get MAC address from config entry:', err);
-          }
-        }
 
         if (!macAddress) {
-          macAddress = prompt('Please enter the MAC address for Wake-on-LAN:');
-          if (!macAddress) return;
+          alert('MAC address is not configured. Please configure it in the integration settings (Settings → Devices & Services → OpenCtrol → Configure).');
+          if (powerMenu) powerMenu.classList.remove('open');
+          return;
         }
 
         this._hass.callService('opencrol', 'wake_on_lan', {
@@ -662,12 +696,32 @@ class OpenCtrolRemoteCard extends HTMLElement {
           console.error('Failed to send Wake-on-LAN packet:', err);
           alert('Failed to send Wake-on-LAN packet. Please check the MAC address and ensure the computer supports WOL.');
         });
+        if (powerMenu) powerMenu.classList.remove('open');
       });
     }
 
+    // Monitor selection button
+    const monitorsBtn = this.querySelector('#monitors-btn');
+    const monitorsMenu = this.querySelector('#monitors-menu');
+    if (monitorsBtn && monitorsMenu) {
+      monitorsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const isOpen = monitorsMenu.classList.contains('open');
+        // Close all other menus
+        this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => {
+          if (menu !== monitorsMenu) menu.classList.remove('open');
+        });
+        if (isOpen) {
+          monitorsMenu.classList.remove('open');
+        } else {
+          monitorsMenu.classList.add('open');
+        }
+      });
+    }
 
-    // Monitor buttons
-    this.querySelectorAll('.monitor-icon').forEach(btn => {
+    // Monitor selection items
+    this.querySelectorAll('.monitor-item').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -695,6 +749,7 @@ class OpenCtrolRemoteCard extends HTMLElement {
             }
           }
         }
+        if (monitorsMenu) monitorsMenu.classList.remove('open');
       });
     });
 
@@ -709,11 +764,14 @@ class OpenCtrolRemoteCard extends HTMLElement {
         e.stopPropagation();
         e.preventDefault();
         const isOpen = soundMenu.classList.contains('open');
+        // Close all other menus
+        this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => {
+          if (menu !== soundMenu) menu.classList.remove('open');
+        });
         if (isOpen) {
           soundMenu.classList.remove('open');
         } else {
           soundMenu.classList.add('open');
-          if (keyboardMenu) keyboardMenu.classList.remove('open');
         }
       });
     }
@@ -723,11 +781,14 @@ class OpenCtrolRemoteCard extends HTMLElement {
         e.stopPropagation();
         e.preventDefault();
         const isOpen = keyboardMenu.classList.contains('open');
+        // Close all other menus
+        this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => {
+          if (menu !== keyboardMenu) menu.classList.remove('open');
+        });
         if (isOpen) {
           keyboardMenu.classList.remove('open');
         } else {
           keyboardMenu.classList.add('open');
-          if (soundMenu) soundMenu.classList.remove('open');
           const textInput = this.querySelector('#text-input');
           if (textInput) setTimeout(() => textInput.focus(), 100);
         }
@@ -737,15 +798,19 @@ class OpenCtrolRemoteCard extends HTMLElement {
     // Close buttons
     this.querySelectorAll('.popup-close').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.querySelectorAll('.popup-menu').forEach(menu => menu.classList.remove('open'));
+        this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => menu.classList.remove('open'));
       });
     });
 
     // Close on outside click (only add once)
     if (!this._outsideClickHandler) {
       this._outsideClickHandler = (e) => {
-        if (!this.contains(e.target)) {
-          this.querySelectorAll('.popup-menu').forEach(menu => menu.classList.remove('open'));
+        const clickedElement = e.target;
+        const isInMenu = this.querySelectorAll('.popup-menu, .dropdown-menu').some(menu => menu.contains(clickedElement));
+        const isMenuButton = clickedElement.closest('.icon-btn');
+        
+        if (!this.contains(clickedElement) || (!isInMenu && !isMenuButton)) {
+          this.querySelectorAll('.popup-menu, .dropdown-menu').forEach(menu => menu.classList.remove('open'));
         }
       };
       document.addEventListener('click', this._outsideClickHandler);

@@ -301,7 +301,7 @@ class OpenCtrolHttpClient:
             response = await self._retry_request(
                 "POST",
                 f"{self.base_url}/api/v1/remotecontrol/audio/app-volume",
-                json={"process_id": process_id, "volume": volume}
+                json={"processId": process_id, "volume": volume}  # Use camelCase to match ASP.NET Core JSON naming policy
             )
             response.raise_for_status()
             data = await response.json()
@@ -352,7 +352,7 @@ class OpenCtrolHttpClient:
             response = await self._retry_request(
                 "POST",
                 f"{self.base_url}/api/v1/remotecontrol/audio/default-device",
-                json={"device_id": device_id}
+                json={"deviceId": device_id}  # Use camelCase to match ASP.NET Core JSON naming policy
             )
             response.raise_for_status()
             data = await response.json()
@@ -531,7 +531,7 @@ class OpenCtrolHttpClient:
             response = await self._retry_request(
                 "POST",
                 f"{self.base_url}/api/v1/remotecontrol/audio/app-device",
-                json={"process_id": process_id, "device_id": device_id}
+                json={"processId": process_id, "deviceId": device_id}  # Use camelCase to match ASP.NET Core JSON naming policy
             )
             response.raise_for_status()
             data = await response.json()

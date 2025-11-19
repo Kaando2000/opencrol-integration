@@ -119,23 +119,129 @@ opencrol-remote-card .icon-btn.computer-wol-btn {
   color: #4caf50;
 }
 
-opencrol-remote-card .monitor-icons {
-  display: inline-flex;
-  gap: 2px;
+/* Power Dropdown Menu */
+opencrol-remote-card .power-menu-container {
+  position: relative;
+  display: inline-block;
 }
 
-opencrol-remote-card .monitor-icon {
-  font-size: 0.7em;
-  font-weight: 600;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  min-width: 24px;
+opencrol-remote-card .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--card-background-color, #fff);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1001;
+  display: none;
+  flex-direction: column;
+  min-width: 200px;
+  overflow: hidden;
+  border: 1px solid var(--divider-color, #e0e0e0);
 }
 
-opencrol-remote-card .monitor-icon.active {
+opencrol-remote-card .dropdown-menu.open {
+  display: flex;
+}
+
+opencrol-remote-card .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--primary-text-color, #212121);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.95em;
+  transition: background-color 0.2s ease;
+  width: 100%;
+}
+
+opencrol-remote-card .dropdown-item:hover:not(:disabled) {
+  background-color: var(--divider-color, rgba(0, 0, 0, 0.08));
+}
+
+opencrol-remote-card .dropdown-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+opencrol-remote-card .dropdown-item.computer-power-off {
+  color: #f44336;
+}
+
+opencrol-remote-card .dropdown-item.computer-wol {
+  color: #4caf50;
+}
+
+opencrol-remote-card .dropdown-item ha-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+opencrol-remote-card .dropdown-divider {
+  height: 1px;
+  background: var(--divider-color, #e0e0e0);
+  margin: 4px 0;
+}
+
+/* Monitor List */
+opencrol-remote-card .monitor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+opencrol-remote-card .monitor-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--primary-text-color, #212121);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.95em;
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+  justify-content: space-between;
+}
+
+opencrol-remote-card .monitor-item:hover {
+  background-color: var(--divider-color, rgba(0, 0, 0, 0.08));
+}
+
+opencrol-remote-card .monitor-item.active {
   background-color: var(--primary-color, #03a9f4);
   color: white;
+}
+
+opencrol-remote-card .monitor-item ha-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+opencrol-remote-card .monitor-item .check-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--primary-color, #03a9f4);
+}
+
+opencrol-remote-card .monitor-item.active .check-icon {
+  color: white;
+}
+
+opencrol-remote-card .no-monitors {
+  padding: 16px;
+  text-align: center;
+  color: var(--secondary-text-color, #757575);
+  font-style: italic;
 }
 
 /* Big Touchpad Container */

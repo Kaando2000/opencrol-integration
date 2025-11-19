@@ -78,7 +78,7 @@ class OpenCtrolScreenViewer(
         base_url = f"http://{host}:{port}"
         data = self.coordinator.data
         
-        return {
+        attrs = {
             "client_id": self.entry.data.get(ATTR_CLIENT_ID),
             "base_url": base_url,
             "stream_url": f"{base_url}/api/v1/screenstream/stream",
@@ -96,6 +96,11 @@ class OpenCtrolScreenViewer(
                 None
             ),
         }
+        # Add MAC address if configured
+        mac_address = self.entry.data.get("mac_address")
+        if mac_address:
+            attrs["mac_address"] = mac_address
+        return attrs
 
     async def async_turn_on(self) -> None:
         """Turn on the screen capture."""
